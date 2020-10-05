@@ -21,7 +21,7 @@
 EXE=fpga_proto.$(EXT)
 
 TARGETS=$(EXE)
-TARGETINCS=fpga_proto.h fpga_config.h fpga_pre_syn.h fpga_debug.h 
+TARGETINCS=fpga_proto.h fpga_config.h fpga_debug.h 
 TARGETINCSUBDIR=act
 
 OBJS=main.o build_graph.o arb.o timing.o print.o multidr.o read_config.o fpga_debug.o

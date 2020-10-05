@@ -121,6 +121,7 @@ struct node {
   node *next;
 };
 
+
 struct graph {
   node *hd, *tl;
 };
@@ -132,11 +133,10 @@ void add_arb (graph *);
 void add_timing (graph *, int);
 void add_md (graph *);
 void print_verilog (graph *, FILE *);
-
+//void print_inst (node *, fpga_config *);
 }
 
 #include "fpga_config.h"
-#include "fpga_pre_syn.h"
 #include "fpga_debug.h"
 
 

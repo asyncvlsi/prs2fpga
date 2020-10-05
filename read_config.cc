@@ -22,6 +22,7 @@ fpga_config *read_config (FILE *conf_file, int func){
     fc->incx.push_back("");
     fc->print = 1;
     fc->opt = 0;
+    fc->dut = 0;
 
   } else if (func == 1) {
 
@@ -88,6 +89,10 @@ fpga_config *read_config (FILE *conf_file, int func){
           val = strtok(NULL, "=");
           int_val = atoi(val);
           fc->print = int_val;
+        } else if (strcmp(val, "DUT") == 0) {
+          val = strtok(NULL, "=");
+          int_val = atoi(val);
+          fc->dut = int_val;
         } else {
           fatal_error("Unknown config parameter");
         }

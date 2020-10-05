@@ -39,6 +39,8 @@ struct fpga_config {
   unsigned int opt;               //0 - no ff/lut optimization
                                   //1 - basic ff/lut optimization
                                   //>1 - every Nth gate is ff
+
+  unsigned int dut:1;             //create top level inst template
 };
 
 fpga_config *read_config (FILE *, int);

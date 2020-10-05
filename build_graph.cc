@@ -553,7 +553,7 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
   //adding global ports to process node
   for (int i = 0; i < A_LEN(bnl->used_globals); i++) {
     port *fgp = new port;
-    fgp->c = bnl->used_globals[i]->toid()->Canonical(cs);
+    fgp->c = bnl->used_globals[i]->toid()->Canonical(cs); 
     fgp->dir = 1;
     fgp->drive_type = 0;
     fgp->delay = 0;
@@ -564,14 +564,24 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
     fgp->u.p.n = pn;
     pn->gp.push_back(fgp);
   }
+}
 
-
+void traverse_exp(Expr *e) {
+  if (e->type == 0) {
+    fprintf(stdout, "E TYPE 0\n");
+    traverse_exp(e->u.e.l);
+    traverse_exp(e->u.e.r);
+  } else if (e->type == 1) {
+    fprintf(stdout, "E TYPE 1\n");
+  } else {
+    fprintf(stdout, "HERE\n");
+  }
 }
 
 //Main function to create a linked list of 
 //unique process node form ACT data structure
 void build_fpga_project (Process *p, graph *g) {
-  
+
   act_boolean_netlist_t *bnl = BOOL->getBNL(p);
   netlist_t *nl = NETL->getNL(p);
 
@@ -584,9 +594,20 @@ void build_fpga_project (Process *p, graph *g) {
     return;
   }
 
-  Scope *cs = p->CurScope();
-  act_prs *prs = p->getprs();
-  act_spec *spec = p->getspec();
+  act_languages *lang;
+  Scope *cs;
+  act_prs *prs;
+  act_spec *spec;
+
+  if (p) {
+    lang = p->getlang();
+    cs = p->CurScope();
+  }
+
+  if (lang) {
+    prs = lang->getprs();
+    spec = lang->getspec();
+  }
 
   ActInstiter i(cs);
 
@@ -615,7 +636,7 @@ void build_fpga_project (Process *p, graph *g) {
 
   add_proc_ports(cs,bnl,pn);
   add_instances(cs,bnl,pn);
-  add_gates(cs,nl,prs,pn);
+  if (prs) {  add_gates(cs,nl,prs,pn); }
 
   //appending process node to the graph
   if (g->hd) {
@@ -644,11 +665,6 @@ graph * create_fpga_project (Act *a, Process *p) {
   map_instances(g);
   map_cp(g);
   map_io(g);
-#ifdef DEBUG
-//  print_graph(g);
-//  print_cp(g);
-//  print_io(g);
-#endif
 
   return g;  
 }

@@ -169,81 +169,7 @@ void break_cycle (node *n, port *p, std::vector<port *> &path, int func, int cur
     }
   }
 }
-/*
-//Function goes thought all nodes and gates 
-//inside the process node and collects them 
-//in the path vector. Once visited node/gate 
-//reached it calls check path to see if there 
-//are egisters already on the path.
-void break_cycle (node *n, port *p, std::vector<port *> &path) {
-  int iport = 0;
-  int oport = 0;
-  path.push_back(p);
-  if (p->owner == 2) {
-    if (p->u.g.g->visited == 1) {
-      if (check_path(p, path, 0) == 0) {
-        p->u.g.g->type = 1;
-      }
-      path.pop_back();
-      return;
-    } else {
-      p->u.g.g->visited = 1;
-      for (auto ip : p->u.g.g->p) {
-        if (ip->c == p->c) {
-          break;
-        }
-        iport++;
-      }
-      oport = p->u.g.g->io_map[iport];
-      port *op = p->u.g.g->p[oport];
-      for (auto cp : n->cp[op->c]) {
-        if (cmp_owner(op,cp) == 1) {
-          continue;
-        }
-        if (cp->owner == 0) {
-          if (cp->u.p.n == n) {
-            if (check_path(cp, path,1) == 0 && 
-                        p->u.g.g->type == 0) {
-              p->u.g.g->type = 1;
-              continue;
-            }
-          }
-        }
-        break_cycle(n, cp, path);
-        path.pop_back();
-      }
-    }
-  } else if (p->owner == 1) {
-    if (p->u.i.in->visited == 1) {
-      path.pop_back();
-      return;
-    } else {
-      p->u.i.in->visited = 1;
-      for (auto ip : p->u.i.in->p) {
-        if (ip->c == p->c) {
-          break;
-        }
-        iport++;
-      }
-      for (auto oport : p->u.i.in->io_map[iport]) {
-        port *op = p->u.i.in->p[oport];
-        for (auto cp : n->cp[op->c]) {
-          if (cmp_owner(op,cp) == 1) {
-            continue;
-          }
-          if (cp->owner == 0) {
-            if (cp->u.p.n == n) {
-              continue;
-            }
-          }
-          break_cycle(n, cp, path);
-          path.pop_back();
-        }
-      }
-    }
-  }
-}
-*/
+
 //Function to traverse graph and compute delays
 //from inputs to outputs
 void find_delay (node *n, port *sp, port *p, int &min, int &max) {
@@ -397,7 +323,7 @@ void topo_sort (node *n, port *p, std::vector<port *> &st) {
 
 }
 
-//Functions to find min and max delays
+//Function to find max delays
 void find_max_delay(node *n, port * sp, std::map<port *, int> &pd){
 
   unsigned int delay = 0;
@@ -552,7 +478,6 @@ void process_time (node *n, act_spec *sp) {
   bc->toid()->sPrint(b,1024);
   cc->toid()->sPrint(c,1024);
 
-
   //Check primary ports
   for (auto pp : n->p) {
    // if (pp->dir == 0) {
@@ -562,7 +487,14 @@ void process_time (node *n, act_spec *sp) {
     pp->c->toid()->sPrint(tmp, 1024);
     if (strcmp(a, tmp) == 0) {
       ap = pp;
+			
     }
+	//	if (strcmp(b, tmp) == 0) {
+	//		bp = pp;
+	//	}
+	//	if (strcmp(c, tmp) == 0) {
+	//		cp = pp;
+	//	}
   }
 
   //Check instances ports
@@ -610,13 +542,13 @@ void process_time (node *n, act_spec *sp) {
   Assert (bp, "Didn't find B port ?!\n");
   Assert (cp, "Didn't find C port ?!\n");
 
-//  fprintf(output ,"a-%i\tb-%i\tc-%i\n", ap->dir, bp->dir, cp->dir);
-//  ap->c->toid()->Print(output);
-//  fprintf(output,"\t");
-//  bp->c->toid()->Print(output);
-//  fprintf(output,"\t");
-//  cp->c->toid()->Print(output);
-//  fprintf(output,"\n");
+  //fprintf(stdout ,"a-%i\tb-%i\tc-%i\n", ap->dir, bp->dir, cp->dir);
+  //ap->c->toid()->Print(stdout);
+  //fprintf(stdout,"\t");
+  //bp->c->toid()->Print(stdout);
+  //fprintf(stdout,"\t");
+  //cp->c->toid()->Print(stdout);
+  //fprintf(stdout,"\n");
 
   unsigned int min = 0;
   unsigned int max = 0;
@@ -628,6 +560,12 @@ void process_time (node *n, act_spec *sp) {
   find_min_delay (n, ap, mind);
   min = mind[cp];
   unmark_port_visited(n);
+
+	//for (auto dd : mind) {
+	//	dd.first->c->toid()->Print(stdout);
+	//	fprintf(stdout, "=%i\t",dd.second);
+	//}
+	//fprintf(stdout, "\n------------------------\n");
 
   std::vector<port *> stack;
   for (auto pp : n->p) {
@@ -644,14 +582,26 @@ void process_time (node *n, act_spec *sp) {
     find_max_delay (n, stack[i], maxd);
   }
 
+	//for (auto dd : stack) {
+	//	dd->c->toid()->Print(stdout);
+	//	fprintf(stdout, "\t");
+	//}
+	//fprintf(stdout, "\n------------------------\n");
+	//for (auto dd : maxd) {
+	//	dd.first->c->toid()->Print(stdout);
+	//	fprintf(stdout, "=%i\t",dd.second);
+	//}
+	//fprintf(stdout, "\n------------------------\n");
+
   unmark_port_visited(n);
 
   max = maxd[bp];
 
+//	fprintf(stdout, "%i %i\n", min, max);
+
   if (max >= min) {
     cp->delay = max - min + 1;
   }
-
 
 }
 

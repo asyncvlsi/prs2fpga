@@ -789,10 +789,6 @@ void print_verilog (graph *g, FILE *output) {
           }
           fprintf(output, "\n\n");
         } else if (gn->drive_type == 2) {
-//          fprintf(output, "reg \\");
-//          gn->id->Print(output);
-//          fprintf(output, "_reg = 0");
-//          fprintf(output, " ;\n\n");
           fprintf(output, "always @ (*)\n");
           for (auto i = 0; i < 4; i++) {
             if (i == 0) {
@@ -818,11 +814,6 @@ void print_verilog (graph *g, FILE *output) {
               fprintf(output, " <= 1'b0;\n");
             }
           }
- //         fprintf(output, "else \\");
- //         gn->id->Print(output);
- //         fprintf(output, " <= \\");
- //         gn->id->Print(output);
- //         fprintf(output, "_reg ;");
           fprintf(output, "\n");
         }
       }
@@ -831,17 +822,21 @@ void print_verilog (graph *g, FILE *output) {
     for (auto in = n->cgh; in; in = in->next) {
       if (in->proc && in->n->copy == 0) {
         mn = get_module_name(in->proc);
-        fprintf(output,"\\%s \\%s (\n\t .\\clock (\\clock )\n", 
+        fprintf(output,"\\%s \\%s", 
                                   mn.c_str(), in->inst_name->getName());
       } else if (in->proc && in->n->copy == 1) {
         mn = get_module_name(in->proc);
-        fprintf(output,"\\%s_%i \\%s (\n\t .\\clock (\\clock )\n", 
+        fprintf(output,"\\%s_%i \\%s", 
                                   mn.c_str(), in->n->extra_node, 
                                   in->inst_name->getName());
       } else {
-        fprintf(output, "\\md_mux_%i \\md_mux_%i (\n\t .\\clock (\\clock )\n",
+        fprintf(output, "\\md_mux_%i \\md_mux_%i",
                                   in->extra_inst, in->extra_inst);
       }
+			if (in->array) {
+				fprintf(output, "%s", in->array);
+			}
+			fprintf(output, " (\n\t .\\clock (\\clock )\n");
       int jdr_num = 0;
       if (in->n) {
         for (auto gp : in->n->gp) {

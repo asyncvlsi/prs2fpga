@@ -426,10 +426,18 @@ void find_drivers (graph *g, node *n){
         }
       }
       if (o_num > 1) {
+				int i_flag = 0;
         node *en;
         inst_node *ein;
         std::vector<port *> port_collection;
         for (auto pp : pair.second) {
+					if (pp->dir == 1) {
+						if (i_flag == 0) {
+							i_flag = 1;
+						} else {
+							continue;
+						}
+					}
           port_collection.push_back(pp);
         }
         create_mux(g, n, port_collection);
