@@ -78,6 +78,7 @@ port *copy_port (port *p) {
   cp->drive_type = p->drive_type;
   cp->delay = p->delay;
   cp->forced = p->forced;
+	cp->primary = p->primary;
   return cp;
 }
 
@@ -113,28 +114,33 @@ gate *copy_gate (gate *g) {
 }
 
 inst_node *copy_inst(inst_node *in) {
-  inst_node *cin = new inst_node;
-  cin->proc = in->proc;
-  cin->n = in->n;
-  cin->par = NULL;
-  for (auto pp : in->p) {
-    port *cp;
-    cp = copy_port(pp);
-    cp->owner = 1;
-    cp->u.i.in = cin;
-    cin->p.push_back(cp);
-  }
-  cin->inst_name = in->inst_name;
-  cin->array = in->array;
-  for (auto pp : in->io_map) {
-    for (auto op : pp.second) {
-      cin->io_map[pp.first].push_back(op);
-    }
-  }
-  cin->visited = in->visited;
-  cin->extra_inst = in->extra_inst;
-  cin->next = NULL;
-  return cin;
+	inst_node *cin = new inst_node;
+	cin->proc = in->proc;
+	cin->n = in->n;
+	cin->par = NULL;
+	for (auto pp : in->p) {
+		port *cp;
+		cp = copy_port(pp);
+		if (pp->owner == 0) {
+			cp->owner = 0;
+			cp->u.p.n = pp->u.p.n;
+		} else if (pp->owner == 1) {
+			cp->owner = 1;
+			cp->u.i.in = cin;	
+		}
+		cin->p.push_back(cp);
+	}
+	cin->inst_name = in->inst_name;
+	cin->array = in->array;
+	for (auto pp : in->io_map) {
+	  for (auto op : pp.second) {
+	    cin->io_map[pp.first].push_back(op);
+	  }
+	}
+	cin->visited = in->visited;
+	cin->extra_inst = in->extra_inst;
+	cin->next = NULL;
+	return cin;
 }
 
 //Function to copy process node
@@ -189,7 +195,11 @@ node *copy_node (node *n){
   cn->cgt = NULL;
   for (auto in = n->cgh; in; in = in->next) {
     inst_node *cin = new inst_node;
-    cin = copy_inst(in);
+		if (in->extra_inst != 0) {
+			cin = in;
+		} else {
+	    cin = copy_inst(in);
+		}
     cin->par = cn;
     append_inst (cn, cin);
     for (auto pp : cin->p) {
@@ -226,6 +236,7 @@ gate *create_extra_gate (std::vector<port *> &p) {
     gp->delay = pp->delay;
     gp->forced = pp->forced;
     gp->owner = 2;
+		gp->primary = 1;
     gp->u.g.g = eg;
     if (gp->dir == 1) {
       eg->extra_drivers.push_back(gp);
@@ -242,11 +253,13 @@ gate *create_extra_gate (std::vector<port *> &p) {
 //only one gate
 node *create_extra_node (std::vector<port *> &p) {
   std::vector<port *> new_ports;
+	int o_num = 0;
   node *pn = new node;
   pn->proc = NULL;
   pn->visited = 1;
   pn->weight = 0;
   pn->extra_node = extra_num;
+	pn->copy = 0;
   for (auto pp : p) {
     port *ep = new port;
     ep->c = pp->c;
@@ -256,16 +269,33 @@ node *create_extra_node (std::vector<port *> &p) {
       ep->dir = 1;
       ep->drive_type = 1;
     } else {
+			o_num++;
       ep->dir = 0;
       ep->drive_type = 0;
     }
     ep->delay = pp->delay;
     ep->forced = pp->forced;
     ep->owner = 0;
+		ep->primary = pp->primary;
     ep->u.p.n = pn;
     pn->p.push_back(ep);
     new_ports.push_back(ep);
   }
+	if (o_num == 0) {
+		port *ep = new port;
+	  ep->c = p[0]->c;
+    ep->visited = 1;
+    ep->disable = 0;
+    ep->dir = 0;
+    ep->drive_type = 0;
+    ep->delay = p[0]->delay;
+    ep->forced = p[0]->forced;
+    ep->owner = 0;
+		ep->primary = 0;
+    ep->u.p.n = pn;
+    pn->p.push_back(ep);
+    new_ports.push_back(ep);
+	}
   pn->spec = NULL;
   pn->i_num = 0;
   pn->cgh = NULL;
@@ -282,12 +312,12 @@ node *create_extra_node (std::vector<port *> &p) {
 //Function to create instances of 
 //the extra nodes
 inst_node *create_extra_inst (node *pn, node *n, std::vector<port *> &p) {
+	int o_num = 0;
   inst_node *ein = new inst_node;
   ein->proc = NULL;
   ein->par = pn;
   ein->n = n;
   for (auto pp : p) {
-  //  fprintf(output, "%i\n", pp->owner);
     port *eip = new port;
     eip->c = pp->c;
     eip->visited = 1;
@@ -296,6 +326,7 @@ inst_node *create_extra_inst (node *pn, node *n, std::vector<port *> &p) {
       eip->dir = 1;
       eip->drive_type = 1;
     } else {
+			o_num++;
       eip->dir = 0;
       eip->drive_type = 0;
       update_cp(pn, eip);
@@ -303,7 +334,8 @@ inst_node *create_extra_inst (node *pn, node *n, std::vector<port *> &p) {
     eip->delay = 0;
     eip->forced = 0;
     eip->owner = pp->owner;
-    if (pp->owner == 1) {
+		eip->primary = 0;
+		if (pp->owner == 1) {
       eip->u.i.in = pp->u.i.in;
     } else if (pp->owner == 2) {
       eip->u.g.g = pp->u.g.g;
@@ -312,6 +344,27 @@ inst_node *create_extra_inst (node *pn, node *n, std::vector<port *> &p) {
     }
     ein->p.push_back(eip);
   }
+	if (o_num == 0) {
+    port *eip = new port;
+    eip->c = p[0]->c;
+    eip->visited = 1;
+    eip->disable = 0;
+    eip->dir = 0;
+    eip->drive_type = 0;
+    update_cp(pn, eip);
+    eip->delay = 0;
+    eip->forced = 0;
+    eip->owner = p[0]->owner;
+		eip->primary = 0;
+    if (p[0]->owner == 1) {
+      eip->u.i.in = p[0]->u.i.in;
+    } else if (p[0]->owner == 2) {
+      eip->u.g.g = p[0]->u.g.g;
+    } else {
+      eip->u.p.n = p[0]->u.p.n;
+    }
+    ein->p.push_back(eip);
+	}
   ein->inst_name = NULL;
   ein->array = NULL;
   ein->visited = 0;
@@ -354,6 +407,7 @@ void find_gate (graph *g, inst_node *in, port *p){
   int ic = 0;
   port *op;
   std::vector<port *> npc;
+	int primary_flag = 0;
   for (auto pp : in->n->cp[ip->c]){
     if (pp->owner != 0) {
       npc.push_back(pp);
@@ -366,7 +420,11 @@ void find_gate (graph *g, inst_node *in, port *p){
       } else {
         op = pp;
       }
-    }
+    } else {
+			if (pp->dir == 0 && pp->owner == 0) {
+				primary_flag = 1;
+			}
+		}
     if (pp->dir == 1) {
       ic++;
     }
@@ -376,6 +434,9 @@ void find_gate (graph *g, inst_node *in, port *p){
   } else if (op->owner == 1) {
     unsigned int old_cnt = 0;
     unsigned int new_cnt = 0;
+		if (primary_flag == 1) {
+			op->primary = 1;
+		}
     ip->drive_type = 1;
     op->drive_type = 1;
     old_cnt = op->u.i.in->p.size();
@@ -396,6 +457,9 @@ void find_gate (graph *g, inst_node *in, port *p){
       create_mux(g, in->n, npc);
     } 
   } else if (op->owner == 2) {
+		if (primary_flag == 1){
+			op->primary = 1;
+		}
     ip->drive_type = 1;
     op->drive_type = 1;
     op->u.g.g->drive_type = 1;
@@ -418,7 +482,8 @@ void find_gate (graph *g, inst_node *in, port *p){
 //Function to find multi drivers
 void find_drivers (graph *g, node *n){
   for (auto pair : n->cp) {
-    if (pair.second.size() > 2) {
+		//multi driver case
+    if (pair.second.size() >= 2) {
       int o_num = 0;
       for (auto pp : pair.second) {
         if (pp->dir == 0 && pp->owner != 0) {

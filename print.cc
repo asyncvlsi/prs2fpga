@@ -23,6 +23,8 @@ std::string get_module_name (Process *p) {
       continue;
     } else if (mn[i] == 0x3e) {
       continue;
+    } else if (mn[i] == 0x2c) {
+			buf += "_";
     } else {
       buf += mn[i];
     }
@@ -228,13 +230,18 @@ void print_flag_ending (port *p, FILE *output) {
 void print_port (port *p, int func, FILE *output) {
   p->c->toid()->Print(output);
   if (p->drive_type != 0) {
-    if (p->owner == 1) {
+    if (p->owner == 1 && (p->primary == 0 || p->u.i.in->extra_inst != 0)) {
       ValueIdx *vx;
       vx = p->u.i.in->inst_name;
-      fprintf(output, "_%s", vx->getName());
-    } else if (p->owner == 2 && p->dir == 1) {
-      fprintf(output, "_gate");
-    }
+			if (vx) {
+				fprintf(output, "_%s", vx->getName());
+				if (p->u.i.in->array) {
+					fprintf(output, "%s", p->u.i.in->array);
+				}
+			}
+		}
+  } else if (p->owner == 2 && p->dir == 1) {
+    fprintf(output, "_gate");
   }
   if (func != 0) {
     print_dir_ending(func - 1, output);
@@ -576,7 +583,7 @@ void print_verilog (graph *g, FILE *output) {
             continue;
           }
           for (auto pp : in->p) {
-            if (pp->c == p->c) {
+            if (pp->c == p->c && pp->dir == 0) {
               wire = 1;
             }
           }
@@ -626,6 +633,7 @@ void print_verilog (graph *g, FILE *output) {
     fprintf(output, ");\n");
 
     fprintf(output, "/*----------REGSandWIRES----------*/\n");
+		if (n->extra_node == 0 || n->extra_node != 0 && n->copy == 1) {
     std::map<port *, int> reg_intercon;
     std::vector<port *> wire_intercon;
     int decl = 1;
@@ -691,6 +699,7 @@ void print_verilog (graph *g, FILE *output) {
       wp->c->toid()->Print(output);
       fprintf(output, " ;\n");
     }
+		}
     fprintf(output, "/*----------BODY----------*/\n");
     int prs_cnt = 0;
     if (n->gh) {

@@ -193,6 +193,7 @@ void add_gate_ports(Scope *cs, act_prs_expr_t *e, gate *g) {
       p->visited = 0;
       p->disable = 0;
       p->owner = 2;
+			p->primary = 0;
       p->u.g.g = g;
       g->p.push_back(p);
     } else {
@@ -258,6 +259,7 @@ void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
       go->visited = 0;
       go->disable = 0;
       go->owner = 2;
+			go->primary = 0;
       go->u.g.g = g;
       g->p.push_back(go);
 
@@ -476,6 +478,7 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
               pp->visited = 0;
               pp->disable = 0;
               pp->owner = 1;
+							pp->primary = 0;
               pp->u.i.in = in;
               iport++;
               in->p.push_back(pp);
@@ -511,6 +514,7 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
             pp->visited = 0;
             pp->disable = 0;
             pp->owner = 1;
+						pp->primary = 0;
             pp->u.i.in = in;
             iport++;
             in->p.push_back(pp);
@@ -546,6 +550,7 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
     fp->visited = 0;
     fp->disable = 0;
     fp->owner = 0;
+		fp->primary = 0;
     fp->u.p.n = pn;
     pn->p.push_back(fp);
   }
@@ -561,6 +566,7 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
     fgp->visited = 0;
     fgp->disable = 0;
     fgp->owner = 0;
+		fgp->primary = 0;
     fgp->u.p.n = pn;
     pn->gp.push_back(fgp);
   }

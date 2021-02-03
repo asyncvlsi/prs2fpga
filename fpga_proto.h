@@ -23,6 +23,9 @@ struct port {
   unsigned int forced:2;      //0 - no; 1 - mk_hi; 2 - mk_lo;
 
   unsigned int owner:2;       //0 - proc; 1 - inst node; 2 - gate
+	
+	unsigned int primary:1;			//0 - interconnection
+															//1 - directly connected to the parent port
   union {
     struct {
       node *n;                //process node owner
