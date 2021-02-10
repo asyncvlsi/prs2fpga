@@ -3,7 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
-#include <act/fpga_proto.h>
+#include <act/graph.h>
 #include <act/passes/booleanize.h>
 #include <act/passes/netlist.h>
 #include <act/iter.h>

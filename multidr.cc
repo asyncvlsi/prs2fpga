@@ -1,4 +1,4 @@
-#include <act/fpga_proto.h>
+#include <act/graph.h>
 
 //This part works on the multi drivers
 //either nested or neighboring

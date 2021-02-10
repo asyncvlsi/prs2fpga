@@ -1,6 +1,6 @@
 #include <vector>
 #include <string.h>
-#include <act/fpga_proto.h>
+#include <act/graph.h>
 
 namespace fpga{
 
@@ -63,8 +63,5 @@ void add_arb (graph *g) {
       process_arb_spec(n);
     }
   }
-  #ifdef DEBUG
-// print_arb(g);
-  #endif
 }
 }

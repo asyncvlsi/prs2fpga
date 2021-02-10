@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <act/act.h>
-#include <act/fpga_proto.h>
+#include <act/graph.h>
 #include <act/passes/booleanize.h>
 #include <act/passes/netlist.h>
 
@@ -29,7 +29,7 @@ void usage () {
   fprintf(stdout, "=============================================================================================\n");
   logo();
   fprintf(stdout, "=============================================================================================\n\n");
-  fprintf(stdout, "Usage: fpga_proto [-h] [-p <process_name>] [-o <*.file>] [-c <*.conf>] <*.act>\n");
+  fprintf(stdout, "Usage: prs2fpga [-h] [-p <process_name>] [-o <*.file>] [-c <*.conf>] <*.act>\n");
   fprintf(stdout, "-p - Specify process name;\n");
   fprintf(stdout, "-o - Save to the file(default stdout);\n");
   fprintf(stdout, "-c - Specify config file;\n");

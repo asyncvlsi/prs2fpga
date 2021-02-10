@@ -1,4 +1,4 @@
-#include <act/fpga_proto.h>
+#include <act/graph.h>
 #include <vector>
 #include <map>
 #include <string.h>

@@ -140,6 +140,6 @@ void print_verilog (graph *, FILE *);
 }
 
 #include "fpga_config.h"
-#include "fpga_debug.h"
+#include "debug.h"
 
 

@@ -1,5 +1,5 @@
-#include <act/fpga_proto.h>
-#include <act/fpga_debug.h>
+#include <act/graph.h>
+#include <act/debug.h>
 
 namespace fpga {
 

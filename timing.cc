@@ -1,7 +1,7 @@
 #include <vector>
 #include <string.h>
 #include <utility>
-#include <act/fpga_proto.h>
+#include <act/graph.h>
 
 namespace fpga {
 
@@ -287,6 +287,9 @@ void topo_sort (node *n, port *p, std::vector<port *> &st) {
   }
 
   for (auto pp : n->cp[p->c]) {
+		if (pp->visited == 1) {
+			continue;
+		}
     if (pp == p) {
       continue;
     }
@@ -317,7 +320,6 @@ void topo_sort (node *n, port *p, std::vector<port *> &st) {
       topo_sort(n, op, st);
     }
   }
-
   p->visited = 1;
   st.push_back(p);
 
@@ -452,8 +454,7 @@ void process_time (node *n, act_spec *sp) {
   port *ap = NULL; //a port
   port *bp = NULL; //b port
   port *cp = NULL; //c port
- 
- 
+
   char a[1024];
   char b[1024];
   char c[1024];
@@ -487,14 +488,13 @@ void process_time (node *n, act_spec *sp) {
     pp->c->toid()->sPrint(tmp, 1024);
     if (strcmp(a, tmp) == 0) {
       ap = pp;
-			
     }
-	//	if (strcmp(b, tmp) == 0) {
-	//		bp = pp;
-	//	}
-	//	if (strcmp(c, tmp) == 0) {
-	//		cp = pp;
-	//	}
+		if (strcmp(b, tmp) == 0) {
+			bp = pp;
+		}
+		if (strcmp(c, tmp) == 0) {
+			cp = pp;
+		}
   }
 
   //Check instances ports
@@ -538,18 +538,21 @@ void process_time (node *n, act_spec *sp) {
       cp = gn->p[0];
     }
   }
+
   Assert (ap, "Didn't find A port ?!\n");
   Assert (bp, "Didn't find B port ?!\n");
   Assert (cp, "Didn't find C port ?!\n");
 
-  //fprintf(stdout ,"a-%i\tb-%i\tc-%i\n", ap->dir, bp->dir, cp->dir);
-  //ap->c->toid()->Print(stdout);
-  //fprintf(stdout,"\t");
-  //bp->c->toid()->Print(stdout);
-  //fprintf(stdout,"\t");
-  //cp->c->toid()->Print(stdout);
-  //fprintf(stdout,"\n");
-
+	/*
+	fprintf(stdout, "%s\n", n->proc->getName());
+  fprintf(stdout ,"a-%i\tb-%i\tc-%i\n", ap->dir, bp->dir, cp->dir);
+  ap->c->toid()->Print(stdout);
+  fprintf(stdout,"\t");
+  bp->c->toid()->Print(stdout);
+  fprintf(stdout,"\t");
+  cp->c->toid()->Print(stdout);
+  fprintf(stdout,"\n");
+	*/
   unsigned int min = 0;
   unsigned int max = 0;
 
@@ -560,13 +563,13 @@ void process_time (node *n, act_spec *sp) {
   find_min_delay (n, ap, mind);
   min = mind[cp];
   unmark_port_visited(n);
-
-	//for (auto dd : mind) {
-	//	dd.first->c->toid()->Print(stdout);
-	//	fprintf(stdout, "=%i\t",dd.second);
-	//}
-	//fprintf(stdout, "\n------------------------\n");
-
+	/*
+	for (auto dd : mind) {
+		dd.first->c->toid()->Print(stdout);
+		fprintf(stdout, "=%i\t",dd.second);
+	}
+	fprintf(stdout, "\n------------------------\n");
+	*/
   std::vector<port *> stack;
   for (auto pp : n->p) {
     if (pp->dir == 1) {
@@ -581,23 +584,23 @@ void process_time (node *n, act_spec *sp) {
   for (auto i = len - 1; i >= 0; i--) {
     find_max_delay (n, stack[i], maxd);
   }
-
-	//for (auto dd : stack) {
-	//	dd->c->toid()->Print(stdout);
-	//	fprintf(stdout, "\t");
-	//}
-	//fprintf(stdout, "\n------------------------\n");
-	//for (auto dd : maxd) {
-	//	dd.first->c->toid()->Print(stdout);
-	//	fprintf(stdout, "=%i\t",dd.second);
-	//}
-	//fprintf(stdout, "\n------------------------\n");
-
+	/*
+	for (auto dd : stack) {
+		dd->c->toid()->Print(stdout);
+		fprintf(stdout, "\t");
+	}
+	fprintf(stdout, "\n------------------------\n");
+	for (auto dd : maxd) {
+		dd.first->c->toid()->Print(stdout);
+		fprintf(stdout, "=%i\t",dd.second);
+	}
+	fprintf(stdout, "\n------------------------\n");
+	*/
   unmark_port_visited(n);
 
   max = maxd[bp];
 
-//	fprintf(stdout, "%i %i\n", min, max);
+	//fprintf(stdout, "%i %i\n", min, max);
 
   if (max >= min) {
     cp->delay = max - min + 1;
