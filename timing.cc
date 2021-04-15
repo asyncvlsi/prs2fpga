@@ -614,7 +614,7 @@ void process_time (node *n, act_spec *sp) {
 void process_time_spec (node *n) {
   act_spec *sp = n->spec;
   while (sp) {
-    if (sp->type == -1) {
+    if (ACT_SPEC_TIMING (sp)) {
       process_time (n, sp);
     }
     sp = sp->next;

@@ -524,7 +524,7 @@ void print_verilog (graph *g, FILE *output) {
   for (auto n = g->hd; n; n = n->next) {
     act_spec *sp = n->spec;
     while (sp) {
-      if (sp->type == -1) {
+      if (ACT_SPEC_TIMING (sp)) {
         ff_flag = 1;
       } else if (sp->type == 2) {
         flag_arb_hi = 1;
