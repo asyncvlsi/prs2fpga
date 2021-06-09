@@ -70,7 +70,7 @@ void print_graph (graph *g, FILE *output){
       fprintf(output, "\t");
       fprintf(output, "%s", nn->id->getName());
       if (nn->extra_gate == 0) {
-        fprintf(output,"(%i,%i,%i,%i,%i,%i,%i)", nn->type, nn->drive_type,
+        fprintf(output,"(%i,%i,%lu,%lu,%lu,%lu,%i)", nn->type, nn->drive_type,
                                               nn->p_up.size(),nn->p_dn.size(),
                                               nn->w_p_up.size(),nn->w_p_dn.size(),
                                               nn->visited);
@@ -246,7 +246,7 @@ void print_gate (gate *g, FILE *output) {
     fprintf(output, "\t%i => %i", pair.first, pair.second);
   }
   fprintf(output, "\n");
-  fprintf(output, "EXTRA DRIVERS(%i): \n", g->extra_drivers.size());
+  fprintf(output, "EXTRA DRIVERS(%lu): \n", g->extra_drivers.size());
   for (auto pp : g->extra_drivers) {
     fprintf(output, "\t");
     pp->c->toid()->Print(output);
