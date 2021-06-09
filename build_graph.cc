@@ -37,6 +37,11 @@ int cmp_owner (port *p1, port *p2) {
         return 0;
       }
     }
+    else {
+       /* should not be here? */
+       fatal_error ("Should not be here");
+       return 0;
+    }
   } else {
     return 0;
   }
