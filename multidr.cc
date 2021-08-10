@@ -132,11 +132,6 @@ inst_node *copy_inst(inst_node *in) {
 	}
 	cin->inst_name = in->inst_name;
 	cin->array = in->array;
-	for (auto pp : in->io_map) {
-	  for (auto op : pp.second) {
-	    cin->io_map[pp.first].push_back(op);
-	  }
-	}
 	cin->visited = in->visited;
 	cin->extra_inst = in->extra_inst;
 	cin->next = NULL;

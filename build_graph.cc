@@ -36,11 +36,10 @@ int cmp_owner (port *p1, port *p2) {
       } else {
         return 0;
       }
-    }
-    else {
-       /* should not be here? */
-       fatal_error ("Should not be here");
-       return 0;
+    } else {
+     /* should not be here? */
+     fatal_error ("Should not be here");
+     return 0;
     }
   } else {
     return 0;
@@ -55,8 +54,12 @@ void find_out (node *n, int ip, port *p) {
   if (p->u.p.n == n && p->dir == 0) {
     for (auto pp : n->p) {
       if (pp->c == p->c) {
-        n->io_map[ip].push_back(oport);
-        return;
+        if (std::find(n->io_map[ip].begin(),
+                      n->io_map[ip].end(),
+                      oport) == n->io_map[ip].end()) {
+          n->io_map[ip].push_back(oport);
+          return;
+        }
       }
       oport++;
     }
@@ -114,12 +117,14 @@ void map_io (graph *g) {
         }
         find_out(n,iport,cp);
         if (n->gh) {
+          //Reset gates
           for (auto gn = n->gh; gn; gn = gn->next) {
             for (auto pp : gn->p) {
               pp->visited = 0;
             }
           }
         }
+        //Reset instances
         if (n->cgh) {
           for (auto in = n->cgh; in; in = in->next) {
             for (auto pp : in->p) {
@@ -129,18 +134,6 @@ void map_io (graph *g) {
         }
       }
       iport++;
-    }
-    for (auto &pair : n->io_map) {
-      std::sort(pair.second.begin(),pair.second.end());
-      auto last = std::unique(pair.second.begin(),pair.second.end());
-      pair.second.erase(last, pair.second.end());
-      for (auto op : pair.second) {
-        std::pair<int, int> io;
-        io.first = pair.first;
-        io.second = op;
-        n->min_io_delay[io] = 10000;
-        n->max_io_delay[io] = 0;
-      }
     }
   }
 }
@@ -198,7 +191,7 @@ void add_gate_ports(Scope *cs, act_prs_expr_t *e, gate *g) {
       p->visited = 0;
       p->disable = 0;
       p->owner = 2;
-			p->primary = 0;
+      p->primary = 0;
       p->u.g.g = g;
       g->p.push_back(p);
     } else {
@@ -264,7 +257,7 @@ void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
       go->visited = 0;
       go->disable = 0;
       go->owner = 2;
-			go->primary = 0;
+      go->primary = 0;
       go->u.g.g = g;
       g->p.push_back(go);
 
@@ -421,6 +414,7 @@ void map_instances (graph *g) {
       for (auto nn = g->hd; nn; nn = nn->next) {
         if (in->proc == nn->proc) {
           in->n = nn;
+          nn->iv.push_back(in);
         }
       }
     }
@@ -483,7 +477,7 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
               pp->visited = 0;
               pp->disable = 0;
               pp->owner = 1;
-							pp->primary = 0;
+              pp->primary = 0;
               pp->u.i.in = in;
               iport++;
               in->p.push_back(pp);
@@ -519,7 +513,7 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
             pp->visited = 0;
             pp->disable = 0;
             pp->owner = 1;
-						pp->primary = 0;
+            pp->primary = 0;
             pp->u.i.in = in;
             iport++;
             in->p.push_back(pp);
@@ -555,7 +549,7 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
     fp->visited = 0;
     fp->disable = 0;
     fp->owner = 0;
-		fp->primary = 0;
+    fp->primary = 0;
     fp->u.p.n = pn;
     pn->p.push_back(fp);
   }
@@ -571,7 +565,7 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
     fgp->visited = 0;
     fgp->disable = 0;
     fgp->owner = 0;
-		fgp->primary = 0;
+    fgp->primary = 0;
     fgp->u.p.n = pn;
     pn->gp.push_back(fgp);
   }
@@ -590,7 +584,7 @@ void traverse_exp(Expr *e) {
 }
 
 //Main function to create a linked list of 
-//unique process node form ACT data structure
+//unique process node from ACT data structure
 void build_fpga_project (Process *p, graph *g) {
 
   act_boolean_netlist_t *bnl = BOOL->getBNL(p);
@@ -647,7 +641,7 @@ void build_fpga_project (Process *p, graph *g) {
 
   add_proc_ports(cs,bnl,pn);
   add_instances(cs,bnl,pn);
-  if (prs) {  add_gates(cs,nl,prs,pn); }
+  if (prs) { add_gates(cs,nl,prs,pn); }
 
   //appending process node to the graph
   if (g->hd) {

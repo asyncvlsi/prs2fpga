@@ -209,12 +209,11 @@ void print_flag_ending (port *p, FILE *output) {
 
   if (p->delay != 0) {
     fprintf(output, "_delay");
+    d = 1;
     for (auto dp : delayed_ports) {
       if (dp == p) {
         d = 0;
         break;
-      } else {
-        d = 1;
       }
     }
     if (d == 1) {
@@ -279,13 +278,14 @@ void print_ff (FILE *output) {
 }
 
 void print_delay (port *p, FILE *output) {
-  fprintf(output, "ff_delay #(.DELAY(%i))\n", p->delay);
-  fprintf(output, "ffd_%i\n (",ffd_num);
-  fprintf(output, ".in(\\");
+  fprintf(output, "ff_delay #(\n\t.DELAY(%i)\n) ", p->delay);
+  fprintf(output, "ffd_%i (",ffd_num);
+  fprintf(output, "\n\t.in(\\");
   p->c->toid()->Print(output);
   fprintf(output, "_delay ),\n");
-  fprintf(output, ".out(\\");
+  fprintf(output, "\t.out(\\");
   p->c->toid()->Print(output);
+  fprintf(output, " )\n");
   fprintf(output, " );\n");
   ffd_num++;
 }

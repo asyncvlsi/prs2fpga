@@ -31,6 +31,6 @@ SRCS=$(OBJS:.o=.cc)
 include $(ACT_HOME)/scripts/Makefile.std
 
 $(EXE): $(OBJS) $(ACTPASSDEPEND) $(TARGETINCS)
-	$(CXX) $(CFLAGS) $(OBJS) -o $(EXE) $(LIBACTPASS)
+	$(CXX) $(CFLAGS) $(OBJS) -o $(EXE) $(LIBACTPASS) -g
 
 -include Makefile.deps

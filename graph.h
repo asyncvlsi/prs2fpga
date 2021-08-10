@@ -23,9 +23,9 @@ struct port {
   unsigned int forced:2;      //0 - no; 1 - mk_hi; 2 - mk_lo;
 
   unsigned int owner:2;       //0 - proc; 1 - inst node; 2 - gate
-	
-	unsigned int primary:1;			//0 - interconnection
-															//1 - directly connected to the parent port
+  
+  unsigned int primary:1;     //0 - interconnection
+                              //1 - directly connected to the parent port
   union {
     struct {
       node *n;                //process node owner
@@ -48,7 +48,7 @@ struct inst_node {
   ValueIdx *inst_name;    //name of the instance
   char *array;            //if it is an array of instances this will hold an index
   
-  std::map<int, std::vector<int> > io_map;  //map input ports to all outputs
+  //std::map<int, std::vector<int> > io_map;  //map input ports to all outputs
                                             //(copy from the original node)
 
   unsigned int visited:2;
@@ -120,6 +120,8 @@ struct node {
   std::map<int, std::vector<int> > io_map;          //map input ports to all outputs
   std::map<std::pair<int, int>, int> max_io_delay;  //max #input to #output delay
   std::map<std::pair<int, int>, int> min_io_delay;  //min #input to #output delay
+
+  std::vector<inst_node *> iv;  //vector to keep pointer to all instances of this node
 
   node *next;
 };
