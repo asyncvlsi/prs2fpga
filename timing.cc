@@ -477,7 +477,8 @@ void find_min_delay(node *n, port *p, std::map<port *, int> &pd) {
 //process scope
 void sat_constr (node *n, act_connection *ac,
                           act_connection *bc,
-                          act_connection *cc) {
+                          act_connection *cc,
+                          int *flag) {
 
   std::map<port *, int> mind;
   std::map<port *, int> maxd;
@@ -485,12 +486,30 @@ void sat_constr (node *n, act_connection *ac,
   port *ap = NULL; //a port
   port *bp = NULL; //b port
   port *cp = NULL; //c port
-
-  
+  /*
   Assert (ac, "What A?!\n");
   Assert (bc, "What B?!\n");
   Assert (cc, "What C?!\n");
-  
+
+  ac->toid()->Print(stdout);
+  fprintf(stdout, "\t");
+  bc->toid()->Print(stdout);
+  fprintf(stdout, "\t");
+  cc->toid()->Print(stdout);
+  fprintf(stdout, "\n");
+*/
+  int tick[3];
+
+  if (flag) {
+    tick[0] = (flag[0] & 0x08) >> 3;
+    tick[1] = (flag[1] & 0x08) >> 3;
+    tick[2] = (flag[2] & 0x08) >> 3;
+  } else {
+    tick[0] = 0;
+    tick[1] = 0;
+    tick[2] = 0;
+  }
+
   for (auto pp : n->cp[ac]) {
     if (pp->dir == 1 && pp->owner == 0) {
       ap = pp;
@@ -507,23 +526,24 @@ void sat_constr (node *n, act_connection *ac,
         mind[pp] = 100000;
         maxd[pp] = 0;
       }
-      if (bc == pair.first && pp->dir == 0) {
+      if (bc == pair.first && (pp->dir == 0 || tick[1])) {
         bp = pp;
-      } else if (cc == pair.first && pp->dir == 0) {
+      } else if (cc == pair.first && (pp->dir == 0 || tick[2])) {
         cp = pp;
       }
     }
   }
-
- // Assert (ap, "Didn't find A port ?!\n");
- // Assert (bp, "Didn't find B port ?!\n");
- // Assert (cp, "Didn't find C port ?!\n");
-
+/*
+  Assert (ap, "Didn't find A port ?!\n");
+  Assert (bp, "Didn't find B port ?!\n");
+  Assert (cp, "Didn't find C port ?!\n");
+*/
+  
   if (!ap || !bp || !cp) { 
     return; 
   }
 
-  /*    
+  
   fprintf(stdout, "%s\n", n->proc->getName());
   ap->c->toid()->Print(stdout);
   fprintf(stdout,"(%i,%i)\t",ap->owner,ap->dir);
@@ -531,7 +551,7 @@ void sat_constr (node *n, act_connection *ac,
   fprintf(stdout,"(%i,%i)\t",bp->owner,bp->dir);
   cp->c->toid()->Print(stdout);
   fprintf(stdout,"(%i,%i)\n",cp->owner,cp->dir);
-  */
+  
   int min = 0;
   int max = 0;
 
@@ -543,7 +563,7 @@ void sat_constr (node *n, act_connection *ac,
   min = mind[cp];
   unmark_port_visited(n);
 
-  /*
+/*  
   fprintf(stdout, "\nMIN------------------------\n");
   for (auto dd : mind) {
     dd.first->c->toid()->Print(stdout);
@@ -603,7 +623,7 @@ void process_time_proc (node *n, act_spec *sp) {
   bc = sp->ids[1]->Canonical(cs);
   cc = sp->ids[2]->Canonical(cs);
 
-  sat_constr(n, ac, bc, cc);
+  sat_constr(n, ac, bc, cc, sp->extra);
 
 }
 
@@ -622,7 +642,7 @@ void process_time_spec (node *n) {
 
 //function to trace timing constraint and find
 //scope where all variables are visible
-void find_spec_scope (node *pn, ValueIdx *i_name, 
+void find_spec_scope (node *pn, ValueIdx *i_name, int *flag,
                                 act_connection *c_ac, 
                                 act_connection *c_bc, 
                                 act_connection *c_cc) {
@@ -690,12 +710,12 @@ void find_spec_scope (node *pn, ValueIdx *i_name,
           pn->cp.find(con[1]) != pn->cp.end() &&
           pn->cp.find(con[2]) != pn->cp.end()) {
    
-        sat_constr(pn, con[0], con[1], con[2]);
+        sat_constr(pn, con[0], con[1], con[2], flag);
     
       } else {
         if (pn->iv.size() > 0) {
           for (auto in : pn->iv) {
-            find_spec_scope (in->par, in->inst_name, con[0], con[1], con[2]); 
+            find_spec_scope (in->par, in->inst_name, flag, con[0], con[1], con[2]); 
           }
         }
       }
@@ -713,7 +733,7 @@ void find_spec_scope (node *pn, ValueIdx *i_name,
               if (pn->cp.find(con[0]) != pn->cp.end() &&
                   pn->cp.find(con[1]) != pn->cp.end() &&
                   pn->cp.find(con[2]) != pn->cp.end()) {
-                sat_constr(pn, con[0], con[1], con[2]);
+                sat_constr(pn, con[0], con[1], con[2], flag);
                 tl[1]->setArray(NULL);
                 tl[2]->setArray(NULL);
               } else {
@@ -721,10 +741,10 @@ void find_spec_scope (node *pn, ValueIdx *i_name,
                 tl[2]->setArray(NULL);
                 if (pn->iv.size() > 0) {
                   for (auto in : pn->iv) {
-                    find_spec_scope(in->par, in->inst_name, con[0], con[1], con[2]);
+                    find_spec_scope(in->par, in->inst_name, flag, con[0], con[1], con[2]);
                   }
                 } else {
-                  find_spec_scope(pn, NULL, con[0], con[1], con[2]);
+                  find_spec_scope(pn, NULL, flag, con[0], con[1], con[2]);
                 }
               }             
             }
@@ -737,17 +757,17 @@ void find_spec_scope (node *pn, ValueIdx *i_name,
             if (pn->cp.find(con[0]) != pn->cp.end() &&
                 pn->cp.find(con[1]) != pn->cp.end() &&
                 pn->cp.find(con[2]) != pn->cp.end()) {
-              sat_constr(pn, con[0], con[1], con[2]);
+              sat_constr(pn, con[0], con[1], con[2], flag);
               tl[1]->setArray(NULL);
             } else {
               tl[1]->setArray(NULL);
               con[1] = id[1]->Canonical(par_scope);
               if (pn->iv.size() > 0) {
                 for (auto in : pn->iv) {
-                  find_spec_scope(in->par, in->inst_name, con[0], con[1], con[2]);
+                  find_spec_scope(in->par, in->inst_name, flag, con[0], con[1], con[2]);
                 }
               } else {
-                find_spec_scope(pn, NULL, con[0], con[1], con[2]);
+                find_spec_scope(pn, NULL, flag, con[0], con[1], con[2]);
               }
             }
           }
@@ -762,16 +782,16 @@ void find_spec_scope (node *pn, ValueIdx *i_name,
           if (pn->cp.find(con[0]) != pn->cp.end() &&
               pn->cp.find(con[1]) != pn->cp.end() &&
               pn->cp.find(con[2]) != pn->cp.end()) {
-            sat_constr(pn, con[0], con[1], con[2]);
+            sat_constr(pn, con[0], con[1], con[2], flag);
             tl[2]->setArray(NULL);
           } else {
             tl[2]->setArray(NULL);
             if (pn->iv.size() > 0) {
               for (auto in : pn->iv) {
-                find_spec_scope(in->par, in->inst_name, con[0], con[1], con[2]);
+                find_spec_scope(in->par, in->inst_name, flag, con[0], con[1], con[2]);
               }
             } else {
-              find_spec_scope(pn, NULL, con[0], con[1], con[2]);
+              find_spec_scope(pn, NULL, flag, con[0], con[1], con[2]);
             }
           }             
         }
@@ -844,6 +864,10 @@ void find_userdef_spec (node *n, UserDef *ud, ActId *pref){
       as = ar_info->stepper();
     }
 
+    if (sp && sp->ids[3]) {
+      continue;
+    }
+
     while (sp) {
       if (ar_info && !as->isend()) {
         ar = as->toArray();
@@ -866,10 +890,10 @@ void find_userdef_spec (node *n, UserDef *ud, ActId *pref){
       if (ac && bc && cc) {
         if (n->iv.size() > 0) {
           for (auto in : n->iv) {
-            find_spec_scope(in->par, in->inst_name, ac, bc, cc);
+            find_spec_scope(in->par, in->inst_name, sp->extra, ac, bc, cc);
           }
         } else {
-          find_spec_scope(n, NULL, ac, bc, cc);
+          find_spec_scope(n, NULL, sp->extra, ac, bc, cc);
         }
       }
     
@@ -888,16 +912,6 @@ void find_userdef_spec (node *n, UserDef *ud, ActId *pref){
       tl->prune();
     }
   }
-}
-
-//Function to process timing constraint
-//in the user defined type
-void process_userdef_spec (graph *g) {
-
-  for (auto n = g->hd; n; n = n->next) {
-    find_userdef_spec(n, NULL, NULL);
-  }
-
 }
 
 //Function to mark every gate as sequential
@@ -960,9 +974,8 @@ void add_timing (graph *g, int func) {
     if (n->spec) {
       process_time_spec(n);
     }
+    find_userdef_spec(n, NULL, NULL);
   }
-
-  process_userdef_spec(g);
   
 }
 
