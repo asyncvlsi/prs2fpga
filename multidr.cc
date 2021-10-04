@@ -519,7 +519,9 @@ void find_drivers (graph *g, node *n){
   }
 };
 
-void add_md (graph *g) {
+void add_md (project *p) {
+
+  graph *g = p->g;
 
   std::vector <node *> graph_copy;
 

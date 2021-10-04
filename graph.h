@@ -5,6 +5,7 @@
 
 namespace fpga {
 
+struct fpga_config;
 struct node;
 struct inst_node;
 struct gate;
@@ -62,10 +63,12 @@ struct inst_node {
 struct gate {
   ActId *id;                            //id
 
-  unsigned int type:2;                  //0 - comb;
+  unsigned int type:3;                  //0 - comb;
                                         //1 - seq; 
                                         //2 - state-holding short;
                                         //3 - state-holding long;
+                                        //4 - explicit unit delay comb #1
+                                        //5 - explicit unit delay sh #1
 
   unsigned int drive_type:3;            //0 - orig; 1 - md master;
                                         //          2 - multiplexer;
@@ -131,17 +134,24 @@ struct graph {
   node *hd, *tl;
 };
 
-//fpga_config *read_config(FILE *, int);
+struct project {
+  graph *g;
+  fpga_config *c;
+
+  unsigned int need_delay:2;  //0 - no, 1 - syn, 2 - non syn
+  unsigned int need_hi_arb:1; //0 - no, 1 - yes
+  unsigned int need_lo_arb:1; //0 - no, 1 - yes
+};
+
 int cmp_owner(port *, port *);
-graph *create_fpga_project (Act *, Process *);
-void add_arb (graph *);
-void add_timing (graph *, int);
-void add_md (graph *);
-void print_verilog (graph *, FILE *);
-//void print_inst (node *, fpga_config *);
+void build_project_graph (project *, Act *, Process *);
+void add_arb (project *);
+void add_timing (project *);
+void add_md (project *);
+void print_verilog (project *, FILE *);
+
 }
 
 #include "fpga_config.h"
 #include "debug.h"
-
 

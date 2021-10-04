@@ -29,10 +29,11 @@ void usage () {
   fprintf(stdout, "=============================================================================================\n");
   logo();
   fprintf(stdout, "=============================================================================================\n\n");
-  fprintf(stdout, "Usage: prs2fpga [-h] [-p <process_name>] [-o <*.file>] [-c <*.conf>] <*.act>\n");
+  fprintf(stdout, "Usage: prs2fpga [-he] [-p <process_name>] [-o <*.file>] [-c <*.conf>] <*.act>\n");
   fprintf(stdout, "-p - Specify process name;\n");
   fprintf(stdout, "-o - Save to the file(default stdout);\n");
   fprintf(stdout, "-c - Specify config file;\n");
+  fprintf(stdout, "-e - Print an explicit delay(non-synthesizable);\n");
   fprintf(stdout, "-h - Usage guide;\n\n");
   fprintf(stdout, "=============================================================================================\n");
   fprintf(stdout, "Configuration file description:\n");
@@ -71,13 +72,18 @@ int main (int argc, char **argv) {
   extern int opterr;
   opterr = 0;
 
-  while ((key = getopt (argc, argv, "p:hmc:o:t:")) != -1) {
+  int unit_option = 0;
+
+  while ((key = getopt (argc, argv, "p:ehmc:o:t:")) != -1) {
     switch (key) {
       case 'c':
         conf = optarg;
         break;
       case 'o':
         fout  = fopen(optarg, "w");
+        break;
+      case 'e':
+        unit_option = -1;
         break;
       case 'h':
         usage();
@@ -126,7 +132,11 @@ int main (int argc, char **argv) {
 		fatal_error ("Process '%s' is not expanded.", proc);
 	}
 
+  fpga::project *fp = new fpga::project;
 	fpga::graph *fg;
+  fpga::fpga_config *fc;
+  
+  fp->g = fg;
 
 	ActBooleanizePass *BOOL = new ActBooleanizePass (a);
 	ActNetlistPass *NETL = new ActNetlistPass (a);
@@ -134,7 +144,6 @@ int main (int argc, char **argv) {
 	Assert (BOOL->run (p), "Booleanize pass failed");
   Assert (NETL->run(p) , "Netlist pass failed");
 
-  fpga::fpga_config *fc;
   FILE *conf_file;
   conf_file = fopen(conf, "r");
   if (conf_file == 0) {
@@ -144,35 +153,37 @@ int main (int argc, char **argv) {
     fclose(conf_file);
   }
 
+  if (unit_option == -1) {
+    fc->opt = -1;
+  }
+  
+  fp->c = fc;
+
   fprintf(stdout, "==========================================\n");
   fprintf(stdout, "\tBUILDING VERILOG PROJECT...\n");
-	fg = fpga::create_fpga_project(a,p);
+	fpga::build_project_graph(fp,a,p);
   fprintf(stdout, "------------------------------------------\n");
   fprintf(stdout, "------------------------------------------\n");
   fprintf(stdout, "\tDONE\n");
   fprintf(stdout, "==========================================\n");
   fprintf(stdout, "\tPLACING EXCLUSION MODULES...\n");
-  fpga::add_arb(fg);
+  fpga::add_arb(fp);
   fprintf(stdout, "------------------------------------------\n");
   fprintf(stdout, "\tDONE\n");
   fprintf(stdout, "==========================================\n");
   fprintf(stdout, "\tSATISFYING TIMING CONSTRAINTS...\n");
-  if (fc->opt == 0) {
-    fpga::add_timing(fg, fc->opt);
-  } else {
-    fpga::add_timing(fg, fc->opt);
-  }
+  fpga::add_timing(fp);
   fprintf(stdout, "------------------------------------------\n");
   fprintf(stdout, "\tDONE\n");
   fprintf(stdout, "==========================================\n");
   fprintf(stdout, "\tHANDLING MULTI DRIVERS...\n");
-  fpga::add_md(fg);
+  fpga::add_md(fp);
   fprintf(stdout, "------------------------------------------\n");
   fprintf(stdout, "\tDONE\n");
   if (fc->print == 1) {
     fprintf(stdout, "==========================================\n");
     fprintf(stdout, "\tPRINTING VERILOG...\n");
-    fpga::print_verilog(fg, fout);
+    fpga::print_verilog(fp, fout);
     fprintf(stdout, "------------------------------------------\n");
     fprintf(stdout, "\tDONE\n");
   }

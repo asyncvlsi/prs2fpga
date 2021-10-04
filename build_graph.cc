@@ -585,7 +585,7 @@ void traverse_exp(Expr *e) {
 
 //Main function to create a linked list of 
 //unique process node from ACT data structure
-void build_fpga_project (Process *p, graph *g) {
+void build_graph (Process *p, graph *g) {
 
   act_boolean_netlist_t *bnl = BOOL->getBNL(p);
   netlist_t *nl = NETL->getNL(p);
@@ -619,7 +619,7 @@ void build_fpga_project (Process *p, graph *g) {
   for (i = i.begin(); i != i.end(); i++) {
     ValueIdx *vx = *i;
     if (TypeFactory::isProcessType(vx->t)) {
-      build_fpga_project (dynamic_cast<Process *>(vx->t->BaseType()), g);
+      build_graph (dynamic_cast<Process *>(vx->t->BaseType()), g);
     }
   }
 
@@ -655,7 +655,8 @@ void build_fpga_project (Process *p, graph *g) {
 
 }
 
-graph * create_fpga_project (Act *a, Process *p) {
+void build_project_graph (project *proj, Act *a, Process *p) {
+
   ActPass *apb = a->pass_find("booleanize");
   ActPass *apn = a->pass_find("prs2net");
 
@@ -666,12 +667,13 @@ graph * create_fpga_project (Act *a, Process *p) {
   g->hd = NULL;
   g->tl = NULL;
 
-  build_fpga_project(p, g);
+  build_graph(p, g);
   map_instances(g);
   map_cp(g);
   map_io(g);
 
-  return g;  
+  proj->g = g;
+
 }
 
 }

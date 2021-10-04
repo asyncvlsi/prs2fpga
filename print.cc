@@ -248,7 +248,7 @@ void print_port (port *p, int func, FILE *output) {
   print_flag_ending(p, output);
 }
 
-void print_ff (FILE *output) {
+void print_ff (int func, FILE *output) {
   fprintf(output, "`timescale 1ns/1ps\n\n");
   fprintf(output, "module \\ff_delay #(\n");
   fprintf(output, "\tparameter\tDELAY\t=\t1\n");
@@ -263,9 +263,15 @@ void print_ff (FILE *output) {
 
   fprintf(output, "assign out = out_d[DELAY-1];\n\n");
 
-  fprintf(output, "always @(posedge clock)\n");
-  fprintf(output, "if (\\reset )\tout_d[0]\t<=\t1'b0;\n");
-  fprintf(output, "else\t\t\tout_d[0] <= in;\n\n");
+  if (func == 1) {
+    fprintf(output, "always @(posedge clock)\n");
+    fprintf(output, "if (\\reset )\tout_d[0]\t<=\t1'b0;\n");
+    fprintf(output, "else\t\t\tout_d[0] <= in;\n\n");
+  } else {
+    fprintf(output, "always @(*)\n");
+    fprintf(output, "if (\\reset )\t#1 out_d[0]\t<=\t1'b0;\n");
+    fprintf(output, "else\t\t\t#1 out_d[0] <= in;\n\n");
+  }
 
   fprintf(output, "genvar i;\n");
   fprintf(output, "generate\n");
@@ -515,27 +521,24 @@ void inst_arb(int dir, std::vector<port *> &fp, FILE *output){
   arb_num++;
 }
 
-void print_verilog (graph *g, FILE *output) {
+void print_verilog (project *proj, FILE *output) {
+
+  graph *g = proj->g;
 
   int ff_flag = 0;
   int flag_arb_hi = 0;
   int flag_arb_lo = 0;
 
-  for (auto n = g->hd; n; n = n->next) {
-    act_spec *sp = n->spec;
-    while (sp) {
-      if (ACT_SPEC_ISTIMING (sp)) {
-        ff_flag = 1;
-      } else if (sp->type == 2) {
-        flag_arb_hi = 1;
-      } else if (sp->type == 3) {
-        flag_arb_lo = 1;
-      }
-      sp = sp->next;
-    }
+  if (proj->need_delay != 0) {
+    ff_flag = 1;
+  } else if (proj->need_hi_arb == 1) {
+    flag_arb_hi = 1;
+  } else if (proj->need_lo_arb == 1) {
+    flag_arb_lo = 1;
   }
+
   if (ff_flag == 1) {
-    print_ff(output);
+    print_ff(proj->need_delay, output);
   }
   if (flag_arb_hi == 1) {
     print_fair_hi(output);
@@ -727,7 +730,9 @@ void print_verilog (graph *g, FILE *output) {
           }
           if (gn->type == 0 || gn->type == 2) {
             fprintf(output, "always @(*)\n");
-          } else  {
+          } else if (gn->type == 4 || gn->type == 5) {
+            fprintf(output, "always @(*)\n");
+          } else {
             fprintf(output, "always @(posedge \\clock )\n");
           }
           for (auto i = 0; i < 4; i++) {
@@ -745,7 +750,12 @@ void print_verilog (graph *g, FILE *output) {
             } else if (i == 3) {
               print_gate(cs, gn->w_p_dn,0, output);
             }
-            fprintf(output, " )\t\\");
+            fprintf(output, " )");
+            if (gn->type == 4 || gn->type == 5) {
+              fprintf(output, "\t#1 \\");
+            } else {
+              fprintf(output, "\t\\");
+            }
             gn->id->Print(output);
             print_flag_ending(gn->p[0], output);
             if (i % 2 == 0) {
@@ -770,16 +780,30 @@ void print_verilog (graph *g, FILE *output) {
             gn->id->Print(output);
             print_flag_ending(gn->p[0], output);
             fprintf(output, " ;");
+          } else if (gn->type == 5) {
+            fprintf(output, "\telse #1 \\");
+            gn->id->Print(output);
+            print_flag_ending(gn->p[0], output);
+            fprintf(output, " <= \\");
+            gn->id->Print(output);
+            print_flag_ending(gn->p[0], output);
+            fprintf(output, " ;");
           }
           fprintf(output, "\n\n");
         } else if (gn->drive_type == 1) {
           for (auto i = 0; i < 4; i++) {
             if (gn->type == 0 || gn->type == 2) {
               fprintf(output, "always @ (*)\n");
+            } else if (gn->type == 4 || gn->type == 5) {
+              fprintf(output, "always @ (*)\n");
             } else {
               fprintf(output, "always @ (posedge \\clock )\n");
             }
-            fprintf(output, "\t\\");
+            if (gn->type == 4 || gn->type == 5) {
+              fprintf(output, "\t#1 \\");
+            } else {
+              fprintf(output, "\t\\");
+            }
             gn->id->Print(output);
             print_dir_ending(i, output);
             print_flag_ending(gn->p[0], output);
@@ -815,7 +839,8 @@ void print_verilog (graph *g, FILE *output) {
               fprintf(output, " |");
               dr_num++;
             }
-            fprintf(output, "1'b0) \\");
+            fprintf(output, "1'b0)");
+            fprintf(output, " \\");
             gn->id->Print(output);
             if (i % 2 == 0) {
               fprintf(output, " <= 1'b1;\n");

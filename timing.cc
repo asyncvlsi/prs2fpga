@@ -543,7 +543,7 @@ void sat_constr (node *n, act_connection *ac,
     return; 
   }
 
-  
+/*  
   fprintf(stdout, "%s\n", n->proc->getName());
   ap->c->toid()->Print(stdout);
   fprintf(stdout,"(%i,%i)\t",ap->owner,ap->dir);
@@ -551,7 +551,7 @@ void sat_constr (node *n, act_connection *ac,
   fprintf(stdout,"(%i,%i)\t",bp->owner,bp->dir);
   cp->c->toid()->Print(stdout);
   fprintf(stdout,"(%i,%i)\n",cp->owner,cp->dir);
-  
+*/
   int min = 0;
   int max = 0;
 
@@ -630,11 +630,12 @@ void process_time_proc (node *n, act_spec *sp) {
 //Function to walk through all all specs and 
 //pick timing ones. Next it calls function
 //to process and satisfy timing constraints
-void process_time_spec (node *n) {
+void process_time_spec (project *p, node *n) {
   act_spec *sp = n->spec;
   while (sp) {
     if (ACT_SPEC_ISTIMING (sp)) {
       process_time_proc (n, sp);
+      p->need_delay = 1;
     }
     sp = sp->next;
   }
@@ -803,7 +804,7 @@ void find_spec_scope (node *pn, ValueIdx *i_name, int *flag,
 
 //Function to find timing constraints in the
 //nested user defined types
-void find_userdef_spec (node *n, UserDef *ud, ActId *pref){
+void find_userdef_spec (project *proj, node *n, UserDef *ud, ActId *pref){
 
   Scope *cs;
   if (ud) {
@@ -837,17 +838,18 @@ void find_userdef_spec (node *n, UserDef *ud, ActId *pref){
           Arraystep *pas = vx->t->arrayInfo()->stepper();
           while (!pas->isend()) {
             pref->Tail()->setArray(pas->toArray());
-            find_userdef_spec(n, iud, pref);
+            find_userdef_spec(proj, n, iud, pref);
             pref->Tail()->setArray(NULL);
             pas->step();
           }
         } else {
-          find_userdef_spec(n, iud, pref);
+          find_userdef_spec(proj, n, iud, pref);
         }
         if (iud->getlang()) {
           if (iud->getlang()->getspec()) {
             if (ACT_SPEC_ISTIMING(iud->getlang()->getspec())) {
               sp = iud->getlang()->getspec();
+              proj->need_delay = 1;
             }
           }
         }
@@ -917,20 +919,37 @@ void find_userdef_spec (node *n, UserDef *ud, ActId *pref){
 //Function to mark every gate as sequential
 void all_regs (node *n) {
   for (auto gn = n->gh; gn; gn = gn->next) {
-    if (gn->type == 0) {
-      gn->type = 1;
-    } else if (gn->type == 2) {
-      gn->type = 3;
+    if (gn->type == 0 || gn->type == 2) {
+      gn->type++;
     }
   }
 }
 
-void add_timing (graph *g, int func) {
+//Function to mark every gate as sequential
+void all_expl_unit (node *n) {
+  for (auto gn = n->gh; gn; gn = gn->next) {
+    if (gn->type == 0) {
+      gn->type = 4;
+    } else if (gn->type == 2) {
+      gn->type = 5;
+    }
+  }
+}
+
+void add_timing (project *proj) {
+
+  graph *g = proj->g;
+  int func = proj->c->opt;
+
   //For every node in the graph place flip-flops
   //either for every gate, or following the rules
   for (auto n = g->hd; n; n = n->next) {
     n->visited = 1;
-    if (func == 0) {
+    if (func == -1) {
+      if (n->g_num > 0) {
+        all_expl_unit(n);
+      }
+    } else if (func == 0) {
       if (n->g_num > 0) {
         all_regs (n);
       }
@@ -972,9 +991,14 @@ void add_timing (graph *g, int func) {
   //For every node satisfy timing forks
   for (auto n = g->hd; n; n = n->next) {
     if (n->spec) {
-      process_time_spec(n);
+      process_time_spec(proj, n);
     }
-    find_userdef_spec(n, NULL, NULL);
+    find_userdef_spec(proj, n, NULL, NULL);
+  }
+  if (proj->need_delay != 0) {
+    if (proj->c->opt == -1) {
+      proj->need_delay = 2;
+    }
   }
   
 }

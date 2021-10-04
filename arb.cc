@@ -47,21 +47,25 @@ void process_arb(node *n, act_spec *sp) {
   tmp.clear();
 }
 
-void process_arb_spec(node *n) {
-  act_spec *sp = n->spec;
-  while (sp) {
-    if (sp->type == 2 || sp->type == 3) {
-      process_arb(n,sp);
+void add_arb (project *p) {
+
+  graph *g = p->g;
+
+  for (auto n = g->hd; n; n = n->next) {
+    if (n->spec) {
+      act_spec *sp = n->spec;
+      while (sp) {
+        if (sp->type == 2) {
+          process_arb(n,sp);
+          p->need_hi_arb = 1;
+        } else if (sp->type == 3) {
+          process_arb(n,sp);
+          p->need_lo_arb = 1;
+        }
+        sp = sp->next;
+      }
     }
-    sp = sp->next;
   }
 }
 
-void add_arb (graph *g) {
-  for (auto n = g->hd; n; n = n->next) {
-    if (n->spec) {
-      process_arb_spec(n);
-    }
-  }
-}
 }
