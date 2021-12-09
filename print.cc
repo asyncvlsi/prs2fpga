@@ -120,11 +120,15 @@ static void _print_prs_expr (Scope *s, act_prs_expr_t *e, int prec, int flip, FI
     if (flip) {
       fprintf (output, "~");
     }
+    fprintf(output, "(");
     prefix_id_print (s, e->u.v.id, output, dir);
+    fprintf(output, " )");
     break;
     
   case ACT_PRS_EXPR_NOT:
+    fprintf(output, "(");
     EMIT_UNOP(3, "~", output,dir);
+    fprintf(output, " )");
     break;
     
   case ACT_PRS_EXPR_LABEL:
@@ -198,9 +202,9 @@ void print_dir_ending (int i, FILE *output) {
   } else if (i == 1) {
     fprintf(output, "_dn");
   } else if (i == 2) {
-    fprintf(output, "_w_up");
+    fprintf(output, "_weak_up");
   } else if (i == 3) {
-    fprintf(output, "_w_dn");
+    fprintf(output, "_weak_dn");
   }
 }
 
@@ -817,7 +821,7 @@ void print_verilog (project *proj, FILE *output) {
             } else if (i == 3) {
               print_gate(cs, gn->w_p_dn,0, output);
             }
-            fprintf(output, ";");
+            fprintf(output, " ? 1'b1 : 1'b0;");
             fprintf(output, "\n");
           }
           fprintf(output, "\n\n");
@@ -893,7 +897,7 @@ void print_verilog (project *proj, FILE *output) {
             fprintf(output, "\t,.\\");
             print_port(in->n->p[i], 0, output);
             print_dir_ending(j, output);
-            if (in->n->copy == 0) {
+            if (in->extra_inst != 0) {
               fprintf(output, "_%i", jdr_num);
             }
             fprintf(output, "\t(\\");

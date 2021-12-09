@@ -60,6 +60,7 @@ int main (int argc, char **argv) {
   char *proc = NULL;
 
   Act::Init(&argc, &argv);
+  config_set_int ("net.black_box_mode", 0);
 
   int print_or_not_to_print = 0; //that is the question
   int how_to_print = 0;

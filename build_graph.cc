@@ -440,8 +440,9 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
   for (i = i.begin(); i != i.end(); i++) {
     ValueIdx *vx = *i;
     if (TypeFactory::isProcessType(vx->t)) {
-      if (BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()))->isempty)
+      if (BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()))->isempty) {
         continue;
+      }
 
       act_boolean_netlist_t *sub;
       sub = BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()));
@@ -453,7 +454,6 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
           break;
         }
       }
-
       if (ports_exist == 1) {
         if (vx->t->arrayInfo()) {
           Arraystep *as = vx->t->arrayInfo()->stepper();
@@ -553,7 +553,6 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
     fp->u.p.n = pn;
     pn->p.push_back(fp);
   }
- 
   //adding global ports to process node
   for (int i = 0; i < A_LEN(bnl->used_globals); i++) {
     port *fgp = new port;
@@ -578,8 +577,6 @@ void traverse_exp(Expr *e) {
     traverse_exp(e->u.e.r);
   } else if (e->type == 1) {
     fprintf(stdout, "E TYPE 1\n");
-  } else {
-    fprintf(stdout, "HERE\n");
   }
 }
 
@@ -597,7 +594,7 @@ void build_graph (Process *p, graph *g) {
 
   if (bnl->isempty) {
     return;
-  }
+  } 
 
   act_languages *lang;
   Scope *cs;
@@ -641,6 +638,7 @@ void build_graph (Process *p, graph *g) {
 
   add_proc_ports(cs,bnl,pn);
   add_instances(cs,bnl,pn);
+
   if (prs) { add_gates(cs,nl,prs,pn); }
 
   //appending process node to the graph
