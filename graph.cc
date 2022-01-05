@@ -434,100 +434,100 @@ void map_instances_io (graph *g) {
 //there is a list of all ports with no separation
 void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
 
-  ActInstiter i(cs);
+  ActUniqProcInstiter i(cs);
 
   int iport = 0;
   for (i = i.begin(); i != i.end(); i++) {
     ValueIdx *vx = *i;
-    if (TypeFactory::isProcessType(vx->t)) {
-      if (BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()))->isempty) {
-        continue;
-      }
+    if (BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()))->isempty) {
+      continue;
+    }
 
-      act_boolean_netlist_t *sub;
-      sub = BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()));
+    act_boolean_netlist_t *sub;
+    sub = BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()));
 
-      int ports_exist = 0;
-      for (int j = 0; j < A_LEN(sub->ports); j++) {
-        if (sub->ports[j].omit == 0) {
-          ports_exist = 1;
-          break;
-        }
+    int ports_exist = 0;
+    for (int j = 0; j < A_LEN(sub->ports); j++) {
+      if (sub->ports[j].omit == 0) {
+	ports_exist = 1;
+	break;
       }
-      if (ports_exist == 1) {
-        if (vx->t->arrayInfo()) {
-          Arraystep *as = vx->t->arrayInfo()->stepper();
-          while (!as->isend()) {
-            inst_node *in = new inst_node;
-            in->n = NULL;
-            in->par = par;
-            in->inst_name = vx;
-            in->array = as->string();
-            in->next = NULL;
-            in->proc = dynamic_cast<Process *> (vx->t->BaseType());
-            in->extra_inst = 0;
-            for (int j = 0; j < A_LEN(sub->ports); j++) {
-              if (sub->ports[j].omit) continue;
-              port *pp = new port;
-              pp->c = bnl->instports[iport]->toid()->Canonical(cs);
-              pp->dir = sub->ports[j].input;
-              pp->drive_type = 0;
-              pp->delay = 0;
-              pp->forced = 0;
-              pp->visited = 0;
-              pp->disable = 0;
-              pp->owner = 1;
-              pp->primary = 0;
-              pp->u.i.in = in;
-              iport++;
-              in->p.push_back(pp);
-            }
-            par->i_num++;
-            if (par->cgh) {
-              par->cgt->next = in;
-              par->cgt = in;
-            } else {
-              par->cgh = in;
-              par->cgh->next = par->cgt;
-              par->cgt = in;
-            }
-            as->step();
-          }
-        } else {
-          inst_node *in = new inst_node;
-          in->n = NULL;
-          in->par = par;
-          in->inst_name = vx;
-          in->array = NULL;
-          in->next = NULL;
-          in->proc = dynamic_cast<Process *> (vx->t->BaseType());
-          in->extra_inst = 0;
-          for (int j = 0; j < A_LEN(sub->ports); j++) {
-            if (sub->ports[j].omit) continue;
-            port *pp = new port;
-            pp->c = bnl->instports[iport]->toid()->Canonical(cs);
-            pp->dir = sub->ports[j].input;
-            pp->drive_type = 0;
-            pp->delay = 0;
-            pp->forced = 0;
-            pp->visited = 0;
-            pp->disable = 0;
-            pp->owner = 1;
-            pp->primary = 0;
-            pp->u.i.in = in;
-            iport++;
-            in->p.push_back(pp);
-          }
-          par->i_num++;
-          if (par->cgh) {
-            par->cgt->next = in;
-            par->cgt = in;
-          } else {
-            par->cgh = in;
-            par->cgh->next = par->cgt;
-            par->cgt = in;
-          }
-        }
+    }
+    if (ports_exist == 1) {
+      if (vx->t->arrayInfo()) {
+	Arraystep *as = vx->t->arrayInfo()->stepper();
+	while (!as->isend()) {
+	  if (vx->isPrimary (as->index())) {
+	    inst_node *in = new inst_node;
+	    in->n = NULL;
+	    in->par = par;
+	    in->inst_name = vx;
+	    in->array = as->string();
+	    in->next = NULL;
+	    in->proc = dynamic_cast<Process *> (vx->t->BaseType());
+	    in->extra_inst = 0;
+	    for (int j = 0; j < A_LEN(sub->ports); j++) {
+	      if (sub->ports[j].omit) continue;
+	      port *pp = new port;
+	      pp->c = bnl->instports[iport]->toid()->Canonical(cs);
+	      pp->dir = sub->ports[j].input;
+	      pp->drive_type = 0;
+	      pp->delay = 0;
+	      pp->forced = 0;
+	      pp->visited = 0;
+	      pp->disable = 0;
+	      pp->owner = 1;
+	      pp->primary = 0;
+	      pp->u.i.in = in;
+	      iport++;
+	      in->p.push_back(pp);
+	    }
+	    par->i_num++;
+	    if (par->cgh) {
+	      par->cgt->next = in;
+	      par->cgt = in;
+	    } else {
+	      par->cgh = in;
+	      par->cgh->next = par->cgt;
+	      par->cgt = in;
+	    }
+	  }
+	  as->step();
+	}
+      } else {
+	inst_node *in = new inst_node;
+	in->n = NULL;
+	in->par = par;
+	in->inst_name = vx;
+	in->array = NULL;
+	in->next = NULL;
+	in->proc = dynamic_cast<Process *> (vx->t->BaseType());
+	in->extra_inst = 0;
+	for (int j = 0; j < A_LEN(sub->ports); j++) {
+	  if (sub->ports[j].omit) continue;
+	  port *pp = new port;
+	  pp->c = bnl->instports[iport]->toid()->Canonical(cs);
+	  pp->dir = sub->ports[j].input;
+	  pp->drive_type = 0;
+	  pp->delay = 0;
+	  pp->forced = 0;
+	  pp->visited = 0;
+	  pp->disable = 0;
+	  pp->owner = 1;
+	  pp->primary = 0;
+	  pp->u.i.in = in;
+	  iport++;
+	  in->p.push_back(pp);
+	}
+	par->i_num++;
+	if (par->cgh) {
+	  par->cgt->next = in;
+	  par->cgt = in;
+	} else {
+	  par->cgh = in;
+	  par->cgh->next = par->cgt;
+	  par->cgt = in;
+	}
       }
     }
   }
