@@ -13,36 +13,53 @@ namespace fpga {
 static ActBooleanizePass *BOOL = NULL;
 static ActNetlistPass *NETL = NULL;
 
+act_booleanized_var_t *get_bool_var(act_boolean_netlist_t *bnl, act_connection *pc)
+{
+  ihash_bucket *hb;
+  act_booleanized_var_t *bv;
+
+  hb = ihash_lookup(bnl->cH, (long)pc);
+  bv = (act_booleanized_var_t *)hb->v;
+
+  return bv;
+}
+
+bool is_input (act_boolean_netlist_t *bnl, act_connection *pc)
+{
+  act_booleanized_var_t *bv = get_bool_var(bnl, pc);
+
+  return bv->input == 1 && bv->used == 1;
+}
+
+bool is_output (act_boolean_netlist_t *bnl, act_connection *pc)
+{
+  act_booleanized_var_t *bv = get_bool_var(bnl, pc);
+
+  return bv->output == 1 && bv->used == 1;
+}
+
+bool is_bidir (act_boolean_netlist_t *bnl, act_connection *pc)
+{
+  act_booleanized_var_t *bv = get_bool_var(bnl, pc);
+
+  return bv->input == 1 && bv->output == 1;
+}
+
 //Function to compare two ports' owners
 //0 - Not equal
 //1 - Equal
-int cmp_owner (port *p1, port *p2) {
+bool cmp_owner (port *p1, port *p2) {
   if (p1->owner == p2->owner) {
-    if (p1->owner == 0){
-      if (p1->u.p.n == p2->u.p.n) {
-        return 1;
-      } else {
-        return 0;
-      }
-    } else if (p1->owner == 1) {
-      if (p1->u.i.in == p2->u.i.in) {
-        return 1;
-      } else {
-        return 0;
-      }
-    } else if (p2->owner == 2) {
-      if (p1->u.g.g == p2->u.g.g) {
-        return 1;
-      } else {
-        return 0;
-      }
-    } else {
+    if (p1->owner == 0)        { return p1->u.p.n == p2->u.p.n; } 
+    else if (p1->owner == 1) { return p1->u.i.in == p2->u.i.in; }
+    else if (p1->owner == 2) { return p1->u.g.g == p2->u.g.g; } 
+    else {
      /* should not be here? */
      fatal_error ("Should not be here");
-     return 0;
+     return false;
     }
   } else {
-    return 0;
+    return false;
   }
 }
 
@@ -53,7 +70,7 @@ void find_out (node *n, int ip, port *p) {
   int iport = 0;
   if (p->u.p.n == n && p->dir == 0) {
     for (auto pp : n->p) {
-      if (pp->c == p->c) {
+      if (pp->c == p->c && pp->dir == p->dir) {
         if (std::find(n->io_map[ip].begin(),
                       n->io_map[ip].end(),
                       oport) == n->io_map[ip].end()) {
@@ -71,14 +88,16 @@ void find_out (node *n, int ip, port *p) {
   p->visited = 1;
   if (p->owner == 1) {
     for (auto pp : p->u.i.in->p) {
-      if (pp->c == p->c) {
+      if (pp->c == p->c && pp->dir == p->dir) {
         break;
       }
       iport++;
     }
     for (auto op : p->u.i.in->n->io_map[iport]) {
-      for (auto cp : n->cp[p->u.i.in->p[op]->c]) {
-        if (cmp_owner(cp,p->u.i.in->p[op]) == 1) {
+      act_connection *tmp_c;
+      tmp_c = p->u.i.in->p[op]->c;
+      for (auto cp : n->cp[tmp_c]) {
+        if (cmp_owner(cp,p->u.i.in->p[op])) {
           continue;
         }
         find_out(n,ip,cp);
@@ -86,14 +105,14 @@ void find_out (node *n, int ip, port *p) {
     }
   } else if (p->owner == 2) {
     for (auto pp : p->u.g.g->p) {
-      if (pp->c == p->c) {
+      if (pp->c == p->c && pp->dir == p->dir) {
         break;
       }
       iport++;
     }
     oport = p->u.g.g->io_map[iport]; 
     for (auto cp : n->cp[p->u.g.g->p[oport]->c]) {
-      if (cmp_owner(p,cp) == 1) {
+      if (cmp_owner(p,cp)) {
         continue;
       }
       find_out(n,ip,cp);
@@ -165,7 +184,10 @@ void map_cp (graph *g) {
 //Function to add ports to gates.
 //Extracting from production rules expression tree
 //traversal.
-void add_gate_ports(Scope *cs, act_prs_expr_t *e, gate *g) { 
+void add_gate_ports(Scope *cs, act_boolean_netlist_t *bnl, act_prs_expr_t *e, gate *g) {
+
+  act_connection *pc;
+
   if (!e) {
     return;
   }
@@ -184,22 +206,18 @@ void add_gate_ports(Scope *cs, act_prs_expr_t *e, gate *g) {
     if (added == 0) {
       port *p = new port;
       p->dir = 1;
-      p->c = e->u.v.id->Canonical(cs);
-      p->drive_type = 0;
-      p->delay = 0;
-      p->forced = 0;
-      p->visited = 0;
-      p->disable = 0;
-      p->owner = 2;
-      p->primary = 0;
-      p->u.g.g = g;
+      pc = e->u.v.id->Canonical(cs);
+      p->c = pc;
+      if (is_bidir(bnl, pc)) { p->bi = 1; } 
+      else { p->bi = 0; }
+      p->setOwner(g);
       g->p.push_back(p);
     } else {
       added = 0;
     }
   } else {
-    add_gate_ports(cs, e->u.e.l, g);
-    add_gate_ports(cs, e->u.e.r, g);
+    add_gate_ports(cs, bnl, e->u.e.l, g);
+    add_gate_ports(cs, bnl, e->u.e.r, g);
   }
 }
 
@@ -210,7 +228,7 @@ void add_gate_ports(Scope *cs, act_prs_expr_t *e, gate *g) {
 //If there is no production rules for some 
 //networks, NULL pointer will be added to the 
 //vector to simplify muli driver resolving
-void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
+void add_gates (Scope *cs, act_boolean_netlist_t *bnl, netlist_t *nl, act_prs *prs, node *par) {
 
   act_prs *tmp_prs;
   tmp_prs = prs;
@@ -219,6 +237,9 @@ void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
   char tmp2[10240];
   std::vector<act_prs_lang_t *> added_prs;
   int added = 0;
+
+  act_connection *pc;
+
   while (prs) {
     for (auto pl = prs->p; pl; pl = pl->next) {
      
@@ -240,8 +261,10 @@ void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
         added_prs.push_back(pl);
       }
   
+      pc = pl->u.one.id->Canonical(cs);
+
       gate *g = new gate;
-      g->id = pl->u.one.id->Canonical(cs)->toid();
+      g->id = pc->toid();
       g->type = 0;
       g->drive_type = 0;
       g->next = NULL;
@@ -249,16 +272,11 @@ void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
       g->extra_gate = 0;
   
       port *go = new port;
-      go->c = pl->u.one.id->Canonical(cs);
+      go->c = pc;
       go->dir = 0;
-      go->drive_type = 0;
-      go->delay = 0;
-      go->forced = 0;
-      go->visited = 0;
-      go->disable = 0;
-      go->owner = 2;
-      go->primary = 0;
-      go->u.g.g = g;
+      if (is_bidir(bnl, pc)) { go->bi = 1; } 
+      else { go->bi = 0; }
+      go->setOwner(g);
       g->p.push_back(go);
 
       int is_weak = 0;
@@ -350,18 +368,11 @@ void add_gates (Scope *cs, netlist_t *nl, act_prs *prs, node *par) {
         tmp_prs = tmp_prs->next;
       }
 
-      for (auto l : g->p_up) {
-        add_gate_ports (cs, l->u.one.e, g);
-      }
-      for (auto l : g->p_dn) {
-        add_gate_ports (cs, l->u.one.e, g);
-      }
-      for (auto l : g->w_p_up) {
-        add_gate_ports (cs, l->u.one.e, g);
-      }
-      for (auto l : g->w_p_dn) {
-        add_gate_ports (cs, l->u.one.e, g);
-      }
+      for (auto l : g->p_up)   { add_gate_ports (cs, bnl, l->u.one.e, g); }
+      for (auto l : g->p_dn)   { add_gate_ports (cs, bnl, l->u.one.e, g); }
+      for (auto l : g->w_p_up) { add_gate_ports (cs, bnl, l->u.one.e, g); }
+      for (auto l : g->w_p_dn) { add_gate_ports (cs, bnl, l->u.one.e, g); }
+
       for (auto nn = nl->hd; nn; nn = nn->next) {
         if (nn->v) {
           if (nn->v->stateholding == 0) { continue; }
@@ -439,95 +450,116 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
   int iport = 0;
   for (i = i.begin(); i != i.end(); i++) {
     ValueIdx *vx = *i;
-    if (BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()))->isempty) {
+    Process *i_proc;
+    i_proc = dynamic_cast<Process *>(vx->t->BaseType());
+
+    if (BOOL->getBNL(i_proc)->isempty) {
       continue;
     }
 
     act_boolean_netlist_t *sub;
-    sub = BOOL->getBNL (dynamic_cast<Process *>(vx->t->BaseType()));
+    sub = BOOL->getBNL (i_proc);
 
     int ports_exist = 0;
     for (int j = 0; j < A_LEN(sub->ports); j++) {
       if (sub->ports[j].omit == 0) {
-	ports_exist = 1;
-	break;
+      	ports_exist = 1;
+      	break;
       }
     }
+
+    act_connection *pc;
+    act_connection *i_pc;
+
     if (ports_exist == 1) {
       if (vx->t->arrayInfo()) {
-	Arraystep *as = vx->t->arrayInfo()->stepper();
-	while (!as->isend()) {
-	  if (vx->isPrimary (as->index())) {
-	    inst_node *in = new inst_node;
-	    in->n = NULL;
-	    in->par = par;
-	    in->inst_name = vx;
-	    in->array = as->string();
-	    in->next = NULL;
-	    in->proc = dynamic_cast<Process *> (vx->t->BaseType());
-	    in->extra_inst = 0;
-	    for (int j = 0; j < A_LEN(sub->ports); j++) {
-	      if (sub->ports[j].omit) continue;
-	      port *pp = new port;
-	      pp->c = bnl->instports[iport]->toid()->Canonical(cs);
-	      pp->dir = sub->ports[j].input;
-	      pp->drive_type = 0;
-	      pp->delay = 0;
-	      pp->forced = 0;
-	      pp->visited = 0;
-	      pp->disable = 0;
-	      pp->owner = 1;
-	      pp->primary = 0;
-	      pp->u.i.in = in;
-	      iport++;
-	      in->p.push_back(pp);
-	    }
-	    par->i_num++;
-	    if (par->cgh) {
-	      par->cgt->next = in;
-	      par->cgt = in;
-	    } else {
-	      par->cgh = in;
-	      par->cgh->next = par->cgt;
-	      par->cgt = in;
-	    }
-	  }
-	  as->step();
-	}
+	      Arraystep *as = vx->t->arrayInfo()->stepper();
+	      while (!as->isend()) {
+	        if (vx->isPrimary (as->index())) {
+            inst_node *in = new inst_node;
+            in->n = NULL;
+            in->par = par;
+            in->inst_name = vx;
+            in->array = as->string();
+            in->next = NULL;
+            in->proc = i_proc;
+            in->extra_inst = 0;
+            for (int j = 0; j < A_LEN(sub->ports); j++) {
+              if (sub->ports[j].omit) continue;
+              pc = bnl->instports[iport]->toid()->Canonical(cs);
+              if (is_input(sub, sub->ports[j].c)) {
+                port *pp = new port;
+                pp->c = pc;
+                pp->dir = 1;
+                if (is_output(sub, sub->ports[j].c)) { pp->bi = 1; } 
+                else { pp->bi = 0; }
+                pp->setOwner(in);
+                in->p.push_back(pp);
+              }
+              if (is_output(sub,sub->ports[j].c)) {
+                port *pp = new port;
+                pp->c = pc;
+                pp->dir = 0;
+                if (is_input(sub,sub->ports[j].c)) { pp->bi = 1; } 
+                else { pp->bi = 0; }
+                pp->setOwner(in);
+                in->p.push_back(pp);
+              }
+              iport++;
+            }
+            par->i_num++;
+            if (par->cgh) {
+              par->cgt->next = in;
+              par->cgt = in;
+            } else {
+              par->cgh = in;
+              par->cgh->next = par->cgt;
+              par->cgt = in;
+            }
+          }
+          as->step();
+        }
       } else {
-	inst_node *in = new inst_node;
-	in->n = NULL;
-	in->par = par;
-	in->inst_name = vx;
-	in->array = NULL;
-	in->next = NULL;
-	in->proc = dynamic_cast<Process *> (vx->t->BaseType());
-	in->extra_inst = 0;
-	for (int j = 0; j < A_LEN(sub->ports); j++) {
-	  if (sub->ports[j].omit) continue;
-	  port *pp = new port;
-	  pp->c = bnl->instports[iport]->toid()->Canonical(cs);
-	  pp->dir = sub->ports[j].input;
-	  pp->drive_type = 0;
-	  pp->delay = 0;
-	  pp->forced = 0;
-	  pp->visited = 0;
-	  pp->disable = 0;
-	  pp->owner = 1;
-	  pp->primary = 0;
-	  pp->u.i.in = in;
-	  iport++;
-	  in->p.push_back(pp);
-	}
-	par->i_num++;
-	if (par->cgh) {
-	  par->cgt->next = in;
-	  par->cgt = in;
-	} else {
-	  par->cgh = in;
-	  par->cgh->next = par->cgt;
-	  par->cgt = in;
-	}
+        inst_node *in = new inst_node;
+        in->n = NULL;
+        in->par = par;
+        in->inst_name = vx;
+        in->array = NULL;
+        in->next = NULL;
+        in->proc = i_proc;
+        in->extra_inst = 0;
+        for (int j = 0; j < A_LEN(sub->ports); j++) {
+          if (sub->ports[j].omit) continue;
+          pc = bnl->instports[iport]->toid()->Canonical(cs);
+          if (is_input(sub, sub->ports[j].c)) {
+            port *pp = new port;
+            pp->c = pc;
+            pp->dir = 1;
+            if (is_output(sub, sub->ports[j].c)) { pp->bi = 1; } 
+            else { pp->bi = 0; }
+            pp->setOwner(in);
+            in->p.push_back(pp);
+          }
+          if (is_output(sub, sub->ports[j].c)) {
+            port *pp = new port;
+            pp->c = pc;
+            pp->dir = 0;
+            if (is_input(sub,sub->ports[j].c)) { pp->bi = 1; } 
+            else { pp->bi = 0; }
+            pp->setOwner(in);
+            in->p.push_back(pp);
+          }
+          iport++;
+        }
+        par->i_num++;
+        if (par->cgh) {
+          par->cgt->next = in;
+          par->cgt = in;
+        } else {
+          par->cgh = in;
+          par->cgh->next = par->cgt;
+          par->cgt = in;
+        }
       }
     }
   }
@@ -537,35 +569,39 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
 //as well as global ports
 void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
 
+  act_connection *pc;
+
   //adding internal ports to process node 
   for (int i = 0; i < A_LEN(bnl->ports); i++) {
     if (bnl->ports[i].omit) continue;
-    port *fp = new port;
-    fp->c = bnl->ports[i].c->toid()->Canonical(cs);
-    fp->dir = bnl->ports[i].input;
-    fp->drive_type = 0;
-    fp->delay = 0;
-    fp->forced = 0;
-    fp->visited = 0;
-    fp->disable = 0;
-    fp->owner = 0;
-    fp->primary = 0;
-    fp->u.p.n = pn;
-    pn->p.push_back(fp);
+    pc = bnl->ports[i].c->toid()->Canonical(cs);
+    if (is_input(bnl, pc)) {
+      port *fpi = new port;
+      fpi->c = pc;
+      fpi->dir = 1;
+      if (is_output(bnl, pc)) { fpi->bi = 1; } 
+      else { fpi->bi = 0; }
+      fpi->setOwner(pn);
+      pn->p.push_back(fpi);
+    }
+    if (is_output(bnl,pc)) {
+      port *fpo = new port;
+      fpo->c = pc;
+      fpo->dir = 0;
+      if (is_input(bnl, pc)) { fpo->bi = 1; } 
+      else { fpo->bi = 0; }
+      fpo->setOwner(pn);
+      pn->p.push_back(fpo);
+    }
   }
+
   //adding global ports to process node
   for (int i = 0; i < A_LEN(bnl->used_globals); i++) {
     port *fgp = new port;
     fgp->c = bnl->used_globals[i]->toid()->Canonical(cs); 
     fgp->dir = 1;
-    fgp->drive_type = 0;
-    fgp->delay = 0;
-    fgp->forced = 0;
-    fgp->visited = 0;
-    fgp->disable = 0;
-    fgp->owner = 0;
-    fgp->primary = 0;
-    fgp->u.p.n = pn;
+    fgp->bi = 0;
+    fgp->setOwner(pn);
     pn->gp.push_back(fgp);
   }
 }
@@ -639,7 +675,7 @@ void build_graph (Process *p, graph *g) {
   add_proc_ports(cs,bnl,pn);
   add_instances(cs,bnl,pn);
 
-  if (prs) { add_gates(cs,nl,prs,pn); }
+  if (prs) { add_gates(cs,bnl,nl,prs,pn); }
 
   //appending process node to the graph
   if (g->hd) {
@@ -651,6 +687,65 @@ void build_graph (Process *p, graph *g) {
     g->tl = pn;
   }
 
+}
+
+void declare_vars (Process *p, graph *g)
+{
+  act_boolean_netlist_t *bnl;
+  Scope *cs;
+
+  for (auto n = g->hd; n; n = n->next) {
+  fprintf(stdout, "======================== %s\n",n->proc->getName());
+    bnl = BOOL->getBNL(n->proc);
+    cs = n->proc->CurScope();
+    
+    phash_iter_t hiter;
+    phash_bucket_t *b;
+    phash_iter_init (bnl->cH, &hiter);
+    while (b = phash_iter_next(bnl->cH, &hiter)) {
+      act_booleanized_var_t *bv;
+      bv = (act_booleanized_var_t *)b->v;
+      var *fv = new var;
+      if (bv->isport == 1) {
+        fv->type = 0;
+        if (bv->input == 1 && bv->output == 1) {
+          fv->port = 2;
+        } else {
+          fv->port = 1;
+        }
+      } else {
+        fv->type = 2;
+        fv->port = 0;
+      }
+      fv->drive_type = 0;
+      fv->forced = 0;
+      fv->delay = 0;
+
+      act_connection *vc = bv->id->toid()->Canonical(cs);
+      n->decl[vc] = fv;
+vc->toid()->Print(stdout);fprintf(stdout, " %i %i %i \n", n->decl[vc]->port, n->decl[vc]->type,n->decl[vc]->drive_type);
+    }
+fprintf(stdout, "\n");
+  }
+}
+
+//Function to determine type of an output port
+//either wire or reg
+void declare_ports (graph *g)
+{
+  for (auto n = g->hd; n; n = n->next) {
+    for (auto pp : n->p) {
+      if (pp->dir == 1) { continue; }
+      for (auto in = n->cgh; in; in = in->next) {
+//        if (in->proc == NULL) { continue; }
+        for (auto ip : in->p) {
+          if (ip->dir == 1) { continue; }
+          if (ip->c == pp->c) { pp->wire = 1; }
+        }
+      }
+    }
+  }
+  return;
 }
 
 void build_project_graph (project *proj, Act *a, Process *p) {
@@ -669,6 +764,8 @@ void build_project_graph (project *proj, Act *a, Process *p) {
   map_instances(g);
   map_cp(g);
   map_io(g);
+  declare_vars(p, g);
+  declare_ports(g);
 
   proj->g = g;
 

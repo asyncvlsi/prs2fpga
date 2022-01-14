@@ -145,7 +145,7 @@ void print_owner (port *p, FILE *output) {
   if (p->owner == 0) {
     fprintf(output, "%s\n", p->u.p.n->proc->getName());
   } else if (p->owner == 1) {
-    fprintf(output, "%s\n", p->u.i.in->n->proc->getName());
+    fprintf(output, "%s\n", p->u.i.in->inst_name->getName());
   } else if (p->owner == 2) {
     p->u.g.g->id->Print(output);
     fprintf(output, "\n");

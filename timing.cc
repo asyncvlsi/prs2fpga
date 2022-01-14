@@ -105,7 +105,7 @@ void break_cycle (node *n, port *p, std::vector<port *> &path, int func, int cur
       port *op = p->u.g.g->p[oport];
       path.push_back(op);
       for (auto cp : n->cp[op->c]) {
-        if (cmp_owner(op,cp) == 1) {
+        if (cmp_owner(op,cp)) {
           continue;
         }
         if (func > 1) {
@@ -159,7 +159,7 @@ void break_cycle (node *n, port *p, std::vector<port *> &path, int func, int cur
         port *op = p->u.i.in->p[oport];
         path.push_back(op);
         for (auto cp : n->cp[op->c]) {
-          if (cmp_owner(op,cp) == 1) {
+          if (cmp_owner(op,cp)) {
             continue;
           }
           if (cp->owner == 0) {
@@ -960,7 +960,7 @@ void add_timing (project *proj) {
           if (p == cp) {
             continue;
           }
-          if (cmp_owner(p,cp) == 1 && cp->dir == 0) {
+          if (cmp_owner(p,cp) == true && cp->dir == 0) {
             p->delay = 1;
           } else {
             int cur = 0;
@@ -975,7 +975,7 @@ void add_timing (project *proj) {
           if (p == cp) {
             continue;
           }
-          if (cmp_owner(p,cp) == 1 && cp->dir == 0) {
+          if (cmp_owner(p,cp) == true && cp->dir == 0) {
             p->delay = 1;
           } else {
             int cur = 0;

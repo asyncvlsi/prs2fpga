@@ -11,13 +11,31 @@ struct inst_node;
 struct gate;
 struct graph;
 
-struct port {
+struct var {
+  unsigned int type:2; //0 - No declaration; 1 - wire; 2 - reg
+  unsigned int drive_type:2; //0 - normal; 1 - split
+  unsigned int port:2; //0 - not port; 1 - port; 2 - biport
+  unsigned int forced:1;
+  unsigned int delay:1;
+};
+
+class port {
+public:
+
+  port();
+  ~port();
+
+  void setOwner(node *);
+  void setOwner(inst_node *);
+  void setOwner(gate *);
+
   act_connection *c;          //connection pointer of the port
 
   unsigned int visited:1;
   unsigned int disable:1;     //not used yet...
 
-  unsigned int dir:1;         //0 - output; 1 - input
+  unsigned int dir:2;         //0 - output; 1 - input
+  unsigned int bi:1;          //0 - unidirectional; 1 - bidirectional(has copy)
   unsigned int drive_type:2;  //0 - orig; 1 - master; 2 - slave
   unsigned int delay;         //0 - orig; N - number of FFs to delay
 
@@ -27,6 +45,9 @@ struct port {
   
   unsigned int primary:1;     //0 - interconnection
                               //1 - directly connected to the parent port
+
+  unsigned int wire:1;        //0 - reg; 1 - wire
+
   union {
     struct {
       node *n;                //process node owner
@@ -126,6 +147,8 @@ struct node {
 
   std::vector<inst_node *> iv;  //vector to keep pointer to all instances of this node
 
+  std::map<act_connection *, var *> decl;
+
   node *next;
 };
 
@@ -143,7 +166,7 @@ struct project {
   unsigned int need_lo_arb:1; //0 - no, 1 - yes
 };
 
-int cmp_owner(port *, port *);
+bool cmp_owner(port *, port *);
 void build_project_graph (project *, Act *, Process *);
 void add_arb (project *);
 void add_timing (project *);
@@ -152,6 +175,6 @@ void print_verilog (project *, FILE *);
 
 }
 
-#include "fpga_config.h"
+#include "proto_config.h"
 #include "debug.h"
 

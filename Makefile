@@ -24,7 +24,7 @@ TARGETS=$(EXE)
 TARGETINCS=graph.h proto_config.h debug.h 
 TARGETINCSUBDIR=act
 
-OBJS=main.o graph.o arb.o timing.o print.o multidr.o proto_config.o debug.o
+OBJS=main.o build_graph.o graph.o arb.o timing.o print.o multidr.o proto_config.o debug.o
 
 SRCS=$(OBJS:.o=.cc)
 
