@@ -274,8 +274,7 @@ void add_gates (Scope *cs, act_boolean_netlist_t *bnl, netlist_t *nl, act_prs *p
       port *go = new port;
       go->c = pc;
       go->dir = 0;
-      if (is_bidir(bnl, pc)) { go->bi = 1; } 
-      else { go->bi = 0; }
+      go->bi = 0;
       go->setOwner(g);
       g->p.push_back(go);
 
@@ -695,7 +694,6 @@ void declare_vars (Process *p, graph *g)
   Scope *cs;
 
   for (auto n = g->hd; n; n = n->next) {
-  fprintf(stdout, "======================== %s\n",n->proc->getName());
     bnl = BOOL->getBNL(n->proc);
     cs = n->proc->CurScope();
     
@@ -723,9 +721,7 @@ void declare_vars (Process *p, graph *g)
 
       act_connection *vc = bv->id->toid()->Canonical(cs);
       n->decl[vc] = fv;
-vc->toid()->Print(stdout);fprintf(stdout, " %i %i %i \n", n->decl[vc]->port, n->decl[vc]->type,n->decl[vc]->drive_type);
     }
-fprintf(stdout, "\n");
   }
 }
 
@@ -737,7 +733,6 @@ void declare_ports (graph *g)
     for (auto pp : n->p) {
       if (pp->dir == 1) { continue; }
       for (auto in = n->cgh; in; in = in->next) {
-//        if (in->proc == NULL) { continue; }
         for (auto ip : in->p) {
           if (ip->dir == 1) { continue; }
           if (ip->c == pp->c) { pp->wire = 1; }

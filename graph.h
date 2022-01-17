@@ -91,8 +91,9 @@ struct gate {
                                         //4 - explicit unit delay comb #1
                                         //5 - explicit unit delay sh #1
 
-  unsigned int drive_type:3;            //0 - orig; 1 - md master;
-                                        //          2 - multiplexer;
+  unsigned int drive_type:3;            //0 - orig; 
+                                        //1 - md master;
+                                        //2 - multiplexer;
 
   unsigned int is_weak:1;               //0 - regular; 1 - weak;
 
@@ -119,7 +120,7 @@ struct node {
 
   unsigned int visited:2;     //0 - no; 1 - yes
   unsigned int extra_node;    //0 - not used; 
-                              //1 - node didn't exist in the original circuit
+                              //!= - node didn't exist in the original circuit
   unsigned int copy:1;        //0 - original node; 1 - modified copy
 
   unsigned int weight;        //node weight for area estimation

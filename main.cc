@@ -5,6 +5,8 @@
 #include <act/passes/booleanize.h>
 #include <act/passes/netlist.h>
 
+#include "debug.h"
+
 void logo () {
 
 fprintf(stdout, "    +  +  +  +  +  +  +  +        +  +  +  +  +  +  +  +        +  +  +  +  +  +  +  +    \n");
