@@ -253,8 +253,8 @@ void print_fair_lo(std::string &fl){
   fl += "endmodule\n";
 }
 
-std::string get_module_name (Process *p) {
-
+std::string get_module_name (Process *p)
+{
   const char *mn = p->getName();
   int len = strlen(mn);
   std::string buf;
@@ -370,8 +370,11 @@ void print_prs_expr(Scope *s,node *n,act_prs_expr_t *e,int flip,int dir,std::str
     fatal_error ("What?");
     break;
   }
+  return;
 }
-void print_prs (Scope *s, node *n, act_prs_lang_t *prs, int dir, std::string &gb) {
+
+void print_prs (Scope *s, node *n, act_prs_lang_t *prs, int dir, std::string &gb) 
+{
   if (prs->u.one.arrow_type == 0) {
     print_prs_expr(s, n, prs->u.one.e, 0, dir, gb);
   } else if (prs->u.one.arrow_type == 1) {
@@ -384,9 +387,24 @@ void print_prs (Scope *s, node *n, act_prs_lang_t *prs, int dir, std::string &gb
     print_prs_expr(s, n, prs->u.one.e, dir, dir, gb);
     gb += " )";
   }
+  return;
 }
 
-void print_flag_ending (port *p, std::string &flag_e) {
+void print_bi_dir (port *p, std::string &st)
+{
+  if (p->bi == 1) {
+    if (p->u.i.in->extra_inst == 0) {
+      if (p->dir == 0) { st += "_out"; } else if (p->dir == 1) { st += "_in"; }
+    } else {
+      if (p->dir == 0) { st += "_out"; } else if (p->dir == 1) { st += "_in"; }
+    }
+  }
+
+  return; 
+}
+
+void print_flag_ending (port *p, std::string &flag_e) 
+{
 
   unsigned int d = 0;
 
@@ -538,9 +556,6 @@ void print_gate (Scope *cs, node *n, gate *gn, std::string &gb)
 
 void print_port_postfix (port *p, int i, std::string &st)
 {
-  if (p->bi == 1 && p->dir == 0) { st += "_out"; } 
-  else if (p->bi == 1 && p->dir == 1) { st += "_in"; }
-
   if (p->drive_type != 0) { print_dir_ending(i, st); }
   print_flag_ending(p, st);
 
@@ -565,13 +580,9 @@ void print_mux (gate *gn, std::string &gb)
         gb += "\telse if (";
       }
     } else if (gn->extra_drivers[0]->drive_type == 1) {
-      gb += "always @ (*)\n\t";
+      print_header(gn, gb);
+      gb += "\t\\";
       gb += id;
-      if (gn->extra_drivers[0]->bi == 1 && gn->extra_drivers[0]->dir == 0) { 
-        gb += "_out";
-      } else if (gn->extra_drivers[0]->bi == 1 && gn->extra_drivers[0]->dir == 1) { 
-        gb += "_in";
-      }
       print_dir_ending(i, gb);
       print_flag_ending(gn->extra_drivers[0], gb);
       gb += " <= (";
@@ -581,8 +592,6 @@ void print_mux (gate *gn, std::string &gb)
       gb += "\\";
       pp->c->toid()->sPrint(buf, 1024);
       gb += buf;
-      if (pp->bi == 1 && pp->dir == 0) { gb += "_out"; }
-      else if (pp->bi == 1 && pp->dir == 1) { gb += "_in"; }
       print_dir_ending(i, gb);
       print_flag_ending(pp, gb);
       gb += "_";
@@ -594,11 +603,6 @@ void print_mux (gate *gn, std::string &gb)
     if (gn->extra_drivers[0]->drive_type == 0) {
       gb += "\\";
       gb += id;
-      if (gn->extra_drivers[0]->dir == 0 && gn->extra_drivers[0]->bi == 1) { 
-        gb += "_out"; 
-      } else if (gn->extra_drivers[0]->dir == 1 && gn->extra_drivers[0]->bi == 1) {
-        gb += "_in"; 
-      }
       if (i == 0 || i == 2) { gb += " <= 1'b1;\n"; } 
       else { gb += " <= 1'b0;\n"; }
     } else {  gb += ";\n"; }
@@ -645,28 +649,22 @@ void inst_arb(int dir, std::vector<port *> &fp, FILE *output){
   arb_num++;
 }
 
-void print_inst_port (port *p, int func, std::string &ins) {
+void print_inst_port (port *p, int func, std::string &ins) 
+{
 
   char buf[1024];
 
   p->c->toid()->sPrint(buf,1024);
   ins += buf;
 
-  if (p->bi == 1) {
-    if (p->u.i.in->extra_inst == 0) {
-      if (p->dir == 0) { ins += "_out"; } else if (p->dir == 1) { ins += "_in"; }
-    } else {
-      if (p->dir == 0) { ins += "_out"; } else if (p->dir == 1) { ins += "_in"; }
-    }
-  }
-  
+  if (p->owner == 0 && p->u.p.n->proc) { print_bi_dir(p, ins); } 
+  if (p->owner == 1) { print_bi_dir(p, ins); } 
+ 
   if (p->drive_type != 0) {
     if (p->owner == 1 && (p->primary == 0 || p->u.i.in->extra_inst != 0)) {
-      ValueIdx *vx;
-      vx = p->u.i.in->inst_name;
-      if (vx) {
+      if (p->u.i.in->inst_name) {
         ins += "_";
-        ins += vx->getName();
+        ins += p->u.i.in->inst_name->getName();
         if (p->u.i.in->array) { ins += p->u.i.in->array; }
       }
     }
@@ -674,6 +672,8 @@ void print_inst_port (port *p, int func, std::string &ins) {
 
   if (func != 0) { print_dir_ending(func - 1, ins); }
   print_flag_ending(p, ins);
+
+  return;
 }
 
 void print_inst_ports (inst_node *in, std::string &ins)
@@ -702,9 +702,8 @@ void print_inst_ports (inst_node *in, std::string &ins)
     } else {
       for (auto j = 0; j < 4; j++) {
         ins += "\t,.\\";
-        print_inst_port(in->n->p[i], 0, ins);
-        print_dir_ending(j, ins);
-        if (in->extra_inst != 0) {
+        print_inst_port(in->n->p[i], j+1, ins);
+        if (in->extra_inst != 0 && in->p[i]->dir == 1) {
           ins += "_";
           ins += std::to_string(jdr_num);
         }
@@ -712,7 +711,7 @@ void print_inst_ports (inst_node *in, std::string &ins)
         print_inst_port(in->p[i], j+1, ins);
         ins += " )\n";
       }
-      jdr_num++;
+      if (in->p[i]->dir == 1) { jdr_num++; }
     }
   }
 
@@ -795,24 +794,25 @@ void print_module_port (port *p, int &cnt, std::string &mh)
 
   int cps = 1;
 
+  if (p->drive_type != 0) { cps = 4; }
+
+  p->c->toid()->sPrint(buf,1024);
+
   if (p->dir == 0) {
-    if (p->drive_type == 1) { cps = 4; }
-    else if (p->drive_type == 2) { cps = 0; }
     for (auto i = 0; i < cps; i++) {
       mh += "\t,output\t";
       if (p->wire == 0) { mh += "reg"; }
       mh += "\t\t\\";
-      p->c->toid()->sPrint(buf,1024);
       mh += buf;
+      if (p->u.p.n->proc) { print_bi_dir(p, mh); }
       print_port_postfix(p, i, mh);
       mh += "\n";
     }
   } else {
-    if (p->drive_type != 0) { cps = 4; }
     for (auto i = 0; i < cps; i++) {
       mh += "\t,input\t\t\t\\";
-      p->c->toid()->sPrint(buf,1024);
       mh += buf;
+      if (p->u.p.n->proc) { print_bi_dir(p, mh); }
       print_port_postfix(p, i, mh);
       if (p->u.p.n->extra_node != 0 && p->u.p.n->proc == NULL) { 
         mh += "_";

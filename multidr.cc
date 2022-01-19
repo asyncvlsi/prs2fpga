@@ -103,6 +103,7 @@ port *copy_port (port *p) {
   cp->delay = p->delay;
   cp->forced = p->forced;
   cp->primary = p->primary;
+  cp->wire = p->wire;
   return cp;
 }
 
@@ -211,8 +212,6 @@ node *copy_node (node *n){
   cn->cgt = NULL;
   for (auto in = n->cgh; in; in = in->next) {
     inst_node *cin = new inst_node;
-//    if (in->extra_inst != 0) { cin = in; } 
-//    else { cin = copy_inst(in); }
     cin = copy_inst(in);
     cin->par = cn;
     append_inst (cn, cin);
@@ -227,9 +226,9 @@ node *copy_node (node *n){
 //Function to create one gate to
 //manage multi drivers inside the
 //extra node
-gate *create_extra_gate (port *ip, std::vector<port *> &p) {
+gate *create_extra_gate (port *ip, std::vector<port *> &p, int type) {
   gate *eg = new gate;
-  eg->type = 0; 
+  eg->type = type; 
   eg->visited = 1;
   eg->extra_gate = extra_num;
   eg->is_weak = 0;
@@ -260,7 +259,7 @@ gate *create_extra_gate (port *ip, std::vector<port *> &p) {
     gp->c = pp->c;
     gp->visited = 1;
     gp->disable = 0;
-    gp->dir = pp->dir;
+    gp->dir = 1;
     gp->bi = pp->bi;
     gp->drive_type = 0;
     gp->delay = pp->delay;
@@ -277,7 +276,7 @@ gate *create_extra_gate (port *ip, std::vector<port *> &p) {
 //Function to create a node to manage multi drivers
 //i.e. multiplexor
 //proc = NULL, extra = 1, only one gate
-node *create_extra_node (port *ip, std::vector<port *> &p) {
+node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
   std::vector<port *> new_ports;
   int o_num = 0;
   node *pn = new node;
@@ -330,7 +329,7 @@ node *create_extra_node (port *ip, std::vector<port *> &p) {
   pn->gh = NULL;
   pn->gt = NULL;
   pn->next = NULL;
-  gate *g = create_extra_gate(ip, new_ports);
+  gate *g = create_extra_gate(ip, new_ports, type);
   append_gate(pn, g);
   return pn;
 }
@@ -386,10 +385,10 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
 //Function to add mutiplexer includes
 //creation and copying of all necessary
 //elements
-void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p) {
+void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) {
   node *en;
   inst_node *ein;
-  en = create_extra_node(ip, p);
+  en = create_extra_node(ip, p, type);
   ein = create_extra_inst(n, en, ip, p);
   append_inst(n, ein);
   prepend_graph(g, en);
@@ -456,7 +455,7 @@ bool find_driver (graph *g, inst_node *in, port *p){
           if (primary_flag == 1) { op->primary = 1; }
           if (op->u.i.in->extra_inst != 0) {
             std::vector<port*> mini_mux = {op};
-            create_mux(g, in->n, op, mini_mux);
+            create_mux(g, in->n, op, mini_mux, 0);
           }
           ip->drive_type = 1;
           op->drive_type = 1;
@@ -507,6 +506,7 @@ void find_md (graph *g, node *n){
   int i_flag_2 = 0;
   int i_flag_3 = 0;
   int i_flag_4 = 0;
+  int gate_dr = 0;
 
   for (auto pair : n->cp) {
     //multi driver case
@@ -518,6 +518,7 @@ void find_md (graph *g, node *n){
       i_flag_2 = 0;
       i_flag_3 = 0;
       i_flag_4 = 0;
+      gate_dr = 0;
       for (auto pp : pair.second) {
         if (pp->dir == 1 && pp->owner != 0) {
           if (pp->bi == 0 && i_flag_1 == 0 && pp->drive_type == 0) {
@@ -547,21 +548,25 @@ void find_md (graph *g, node *n){
             | (pp->dir == 1 && pp->owner == 0)) { 
           o_num++; 
           o_port_collection.push_back(pp);
+          if (pp->owner == 2 && (pp->u.g.g->type == 1 || pp->u.g.g->type == 3)) { 
+            gate_dr = 1; 
+          }
         }
       }
       if (o_num > 1) {
         for (auto ip : i_port_collection) {
-          create_mux(g, n, ip, o_port_collection);
+          if (gate_dr == 1) { create_mux(g, n, ip, o_port_collection, 1); }
+          else { create_mux(g, n, ip, o_port_collection, 0); }
           for (auto op : o_port_collection) {
             if (op->dir == 0) {
               n->decl[op->c]->type = 1;
-              op->wire = 1;
               if (op->owner == 1) {
                 root = find_driver(g, op->u.i.in, op);
                 if (root) { op->drive_type = 1; }
               } else if (op->owner == 2) {
                 op->drive_type = 1;
                 op->u.g.g->drive_type = 1;
+                if (op->delay == 0) { op->u.g.g->type = 0; }
               }
             } else {
               if (op->owner == 0) { op->drive_type = 1; }
@@ -571,11 +576,14 @@ void find_md (graph *g, node *n){
             mv->type = 2;
           }
         }
+        for (auto pp : pair.second) {
+          pp->wire = 1;
+        }
       }
     }
   }
 
-  //Walk thorugh instances and check if their primary ios were
+  //Walk through instances and check if their primary ios were
   //updated at the child level. We need this because we only seek
   //for drivers at lower levels and at parent level they are not 
   //resolved. Even if there is no multiple drivers the source driver
@@ -586,19 +594,12 @@ void find_md (graph *g, node *n){
         if (in->n->p[i]->drive_type != in->p[i]->drive_type) { 
           in->p[i]->drive_type = in->n->p[i]->drive_type;
           for (auto pp : n->cp[in->p[i]->c]) {
-            if (pp->dir == 1 | pp->drive_type != 0) {
-              continue;
-            }
-            if (pp->owner == 0) {
-              pp->drive_type = 1;
-            } else if (pp->owner == 1) {
-              if (pp->u.i.in->extra_inst != 0) {
-                continue;
-              }
+            if (pp->dir == 1 | pp->drive_type != 0) { continue; }
+            if (pp->owner == 0) { pp->drive_type = 1; } 
+            else if (pp->owner == 1) {
+              if (pp->u.i.in->extra_inst != 0) { continue; }
               root = find_driver(g, pp->u.i.in, pp);
-              if (root) {
-                pp->drive_type = 1;
-              }
+              if (root) { pp->drive_type = 1; }
             } else if (pp->owner == 2) {
               pp->drive_type = 1;
               pp->u.g.g->drive_type = 1;
@@ -610,15 +611,6 @@ void find_md (graph *g, node *n){
   }
 
 };
-
-void remap_instances (node *n)
-{
-  for (auto nn = n; nn; nn = nn->next) {
-
-  }
-
-  return;
-}
 
 void add_md (project *p) {
 
