@@ -693,6 +693,8 @@ void declare_vars (Process *p, graph *g)
   act_boolean_netlist_t *bnl;
   Scope *cs;
 
+  int tmp = 0;
+
   for (auto n = g->hd; n; n = n->next) {
     bnl = BOOL->getBNL(n->proc);
     cs = n->proc->CurScope();
@@ -704,7 +706,7 @@ void declare_vars (Process *p, graph *g)
       act_booleanized_var_t *bv;
       bv = (act_booleanized_var_t *)b->v;
       var *fv = new var;
-      if (bv->isport == 1) {
+      if (bv->isport == 1 || bv->isglobal == 1) {
         fv->type = 0;
         if (bv->input == 1 && bv->output == 1) {
           fv->port = 2;
@@ -720,6 +722,12 @@ void declare_vars (Process *p, graph *g)
       fv->delay = 0;
 
       act_connection *vc = bv->id->toid()->Canonical(cs);
+      for (auto pp : n->cp[vc]) {
+        if (pp->owner == 1) { tmp = 1; }
+        else { tmp = 0; break; }
+      }
+      if (tmp == 1) { fv->type = 1; }
+
       n->decl[vc] = fv;
     }
   }

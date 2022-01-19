@@ -433,8 +433,7 @@ bool find_driver (graph *g, inst_node *in, port *p){
 
   if (in->extra_inst == 0) {
     for (auto pp : in->n->cp[ip->c]) {
-      if (pp->owner == 0) { continue; }
-      if (pp->dir == 1) { continue; }
+      if (pp->owner == 0 || pp->dir == 1 || pp->visited == 1) { continue; }
       if (pp->owner == 1 && pp->u.i.in->extra_inst != 0) {
         op = pp;
         break;
@@ -448,6 +447,7 @@ bool find_driver (graph *g, inst_node *in, port *p){
 
   bool root = true;
   if (op) {
+    op->visited = 1;
     if (op->drive_type == 0) {
       if (op->owner == 1) {
         root = find_driver(g, op->u.i.in, op);

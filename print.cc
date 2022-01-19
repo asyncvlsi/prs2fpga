@@ -664,7 +664,12 @@ void print_inst_port (port *p, int func, std::string &ins)
     if (p->owner == 1 && (p->primary == 0 || p->u.i.in->extra_inst != 0)) {
       if (p->u.i.in->inst_name) {
         ins += "_";
-        ins += p->u.i.in->inst_name->getName();
+        if (p->u.i.in->extra_inst == 0) {
+          ins += p->u.i.in->inst_name->getName();
+        } else {
+          ins += "md_";
+          ins += std::to_string(p->u.i.in->extra_inst);
+        }
         if (p->u.i.in->array) { ins += p->u.i.in->array; }
       }
     }
