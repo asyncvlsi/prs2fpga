@@ -104,6 +104,8 @@ port *copy_port (port *p) {
   cp->forced = p->forced;
   cp->primary = p->primary;
   cp->wire = p->wire;
+  cp->extra_owner = p->extra_owner;
+  cp->e = p->e;
   return cp;
 }
 
@@ -122,18 +124,17 @@ gate *copy_gate (gate *g) {
     cp->u.g.g = cg;
     cg->p.push_back(cp);
   }
-  for (auto netw : g->p_up) {
-    cg->p_up.push_back(netw);
+  for (auto pp : g->extra_drivers) {
+    port *cp;
+    cp = copy_port(pp);
+    cp->owner = 2;
+    cp->u.g.g = cg;
+    cg->extra_drivers.push_back(cp);   
   }
-  for (auto netw : g->p_dn) {
-    cg->p_dn.push_back(netw);
-  }
-  for (auto netw : g->w_p_up) {
-    cg->w_p_up.push_back(netw);
-  }
-  for (auto netw : g->w_p_dn) {
-    cg->w_p_dn.push_back(netw);
-  }
+  for (auto netw : g->p_up) { cg->p_up.push_back(netw); }
+  for (auto netw : g->p_dn) { cg->p_dn.push_back(netw); }
+  for (auto netw : g->w_p_up) { cg->w_p_up.push_back(netw); }
+  for (auto netw : g->w_p_dn) { cg->w_p_dn.push_back(netw); }
   cg->next = NULL;
   return cg;  
 }
@@ -146,13 +147,9 @@ inst_node *copy_inst(inst_node *in) {
   for (auto pp : in->p) {
     port *cp;
     cp = copy_port(pp);
-    if (pp->owner == 0) {
-      cp->owner = 0;
-      cp->u.p.n = pp->u.p.n;
-    } else if (pp->owner == 1) {
-      cp->owner = 1;
-      cp->u.i.in = cin; 
-    }
+    if (pp->owner == 0) { cp->setOwner(pp->u.p.n); } 
+    else if (pp->owner == 1) { cp->setOwner(pp->u.i.in); } 
+    else { cp->setOwner(pp->u.g.g); }
     cin->p.push_back(cp);
   }
   cin->inst_name = in->inst_name;
@@ -165,15 +162,10 @@ inst_node *copy_inst(inst_node *in) {
 
 //Function to copy process node and modify its ports because 
 //not every instance of the process is a part of the multi driver
-//Copy only printable part because the rest of the structure is for 
-//computation
-node *copy_node (node *n){
+node *copy_node (node *n) {
   node *cn = new node;
-  if (n->proc) {
-    cn->proc = n->proc;
-  } else {
-    fatal_error("You should not copy this");
-  }
+  if (n->proc) { cn->proc = n->proc; } 
+  else { cn->proc = NULL; }
   cn->visited = 1;
   cn->extra_node = extra_num;
   extra_num++;
@@ -182,11 +174,13 @@ node *copy_node (node *n){
   for (auto pp : n->p) {
     port *cpp;
     cpp = copy_port(pp);
-    cpp->owner = 0;
-    cpp->u.p.n = cn;
+    if (pp->owner == 0) { cpp->setOwner(cn); } 
+    else if (pp->owner == 1) { cpp->setOwner(pp->u.i.in); } 
+    else { cpp->setOwner(pp->u.g.g); }
     cn->p.push_back(cpp);
     cn->cp[cpp->c].push_back(cpp);
   }
+
   for (auto gp : n->gp) {
     port *cgpp;
     cgpp = copy_port(gp);
@@ -203,9 +197,7 @@ node *copy_node (node *n){
     gate *cg;
     cg = copy_gate(gn);
     append_gate(cn, cg);
-    for (auto pp : cg->p) {
-      cn->cp[pp->c].push_back(pp);
-    }
+    for (auto pp : cg->p) { cn->cp[pp->c].push_back(pp); }
   }
   cn->i_num = n->i_num;
   cn->cgh = NULL;
@@ -215,7 +207,10 @@ node *copy_node (node *n){
     cin = copy_inst(in);
     cin->par = cn;
     append_inst (cn, cin);
-    for (auto pp : cin->p) { cn->cp[pp->c].push_back(pp); }
+    for (auto pp : cin->p) { 
+      if (pp->e) { pp->e = cin; }
+      cn->cp[pp->c].push_back(pp); 
+    }
   }
   cn->spec = n->spec;
   cn->decl.insert(n->decl.begin(), n->decl.end());
@@ -248,6 +243,7 @@ gate *create_extra_gate (port *ip, std::vector<port *> &p, int type) {
   gop->drive_type = ip->drive_type;
   gop->delay = ip->delay;
   gop->forced = ip->forced;
+  gop->extra_owner = 0;
   gop->owner = 2;
   gop->primary = 1;
   gop->u.g.g = eg;
@@ -264,6 +260,7 @@ gate *create_extra_gate (port *ip, std::vector<port *> &p, int type) {
     gp->drive_type = 0;
     gp->delay = pp->delay;
     gp->forced = pp->forced;
+    gp->extra_owner = 0;
     gp->owner = 2;
     gp->primary = 1;
     gp->u.g.g = eg;
@@ -286,7 +283,9 @@ node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
   pn->extra_node = extra_num;
   pn->copy = 0;
 
-  port *ep = new port;
+  port *ep;
+  ep = new port;
+
   ep->c = ip->c;
   ep->visited = 1;
   ep->disable = 0;
@@ -295,16 +294,16 @@ node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
   ep->drive_type = ip->drive_type;
   ep->delay = ip->delay;
   ep->forced = ip->forced;
+  ep->extra_owner = 0;
   ep->owner = 0;
   ep->primary = 0;
   ep->u.p.n = pn;
   pn->p.push_back(ep);
   new_ports.push_back(ep);
-
   pn->cp[ip->c].push_back(ep);
 
   for (auto pp : p) {
-    port *ep = new port;
+    ep = new port;
     ep->c = pp->c;
     ep->visited = 1;
     ep->disable = 0;
@@ -313,6 +312,7 @@ node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
     ep->drive_type = 1;
     ep->delay = pp->delay;
     ep->forced = pp->forced;
+    ep->extra_owner = 0;
     ep->owner = 0;
     ep->primary = pp->primary;
     ep->u.p.n = pn;
@@ -342,21 +342,27 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
   ein->par = pn;
   ein->n = n;
 
-  port *eip = new port;
+  port *eip;
+
+  eip = new port;
   eip->c = ip->c;
-  eip->visited = 1;
+  eip->visited = 0;
   eip->disable = 0;
   eip->dir = 0;
   eip->bi = ip->bi;
   eip->drive_type = ip->drive_type;
   eip->delay = 0;
   eip->forced = 0;
-  eip->owner = 1;
   eip->primary = 0;
-  eip->u.i.in = ip->u.i.in;
+  eip->setExtraOwner(ein);
+  if (ip->owner == 0) { eip->setOwner(ip->u.p.n); } 
+  else if (ip->owner == 1) { eip->setOwner(ip->u.i.in); }
+  else { eip->setOwner(ip->u.g.g); }
+  ein->p.push_back(eip);
+  update_cp(pn, eip);
 
   for (auto pp : p) {
-    port *eip = new port;
+    eip = new port;
     eip->c = pp->c;
     eip->visited = 1;
     eip->disable = 0;
@@ -365,20 +371,19 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
     eip->drive_type = 1;
     eip->delay = 0;
     eip->forced = 0;
-    eip->owner = 1;
     eip->primary = 0;
-    eip->u.i.in = pp->u.i.in;
+    eip->setExtraOwner(ein);
+    if (pp->owner == 0) { eip->setOwner(pp->u.p.n); } 
+    else if (pp->owner == 1) { eip->setOwner(pp->u.i.in); } 
+    else { eip->setOwner(pp->u.g.g); }
     ein->p.push_back(eip);
   }
 
-
-  ein->p.push_back(eip);
   ein->inst_name = NULL;
   ein->array = NULL;
   ein->visited = 0;
   ein->extra_inst = extra_num;
   ein->next = NULL;
-  update_cp(pn, eip);
   return ein;
 }
 
@@ -386,13 +391,14 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
 //creation and copying of all necessary
 //elements
 void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) {
+//fprintf(stdout, "%s %i\n",n->proc->getName(), extra_num);
   node *en;
   inst_node *ein;
   en = create_extra_node(ip, p, type);
   ein = create_extra_inst(n, en, ip, p);
   append_inst(n, ein);
   prepend_graph(g, en);
-  ++extra_num;
+  extra_num++;
 }
 
 
@@ -401,13 +407,13 @@ void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) 
 //Arguments are the circuit graph, instance inside which
 //the gate is sitting and the output port we are looking for
 bool find_driver (graph *g, inst_node *in, port *p){
-  
-  if (in->n->copy == 0 && in->extra_inst == 0) {
+ 
+  if (in->n->copy == 0) {
     node *cn;
     cn = copy_node(in->n);
     prepend_graph(g, cn);
     in->n = cn;
-  } 
+  }
 
   //Find port index inside the instance scope
   port *ip;
@@ -418,9 +424,7 @@ bool find_driver (graph *g, inst_node *in, port *p){
       iport++;
     }
     ip = in->n->p[iport];
-  } else {
-    ip = in->n->p[0];
-  }
+  } else { ip = in->n->p[0]; }
 
   //Traverse port a list of ports corresponding to the
   //case act_connection as the port in the arg list
@@ -434,23 +438,20 @@ bool find_driver (graph *g, inst_node *in, port *p){
   if (in->extra_inst == 0) {
     for (auto pp : in->n->cp[ip->c]) {
       if (pp->owner == 0 || pp->dir == 1 || pp->visited == 1) { continue; }
-      if (pp->owner == 1 && pp->u.i.in->extra_inst != 0) {
+      if (pp->extra_owner == 1) {
         op = pp;
         break;
-      } else {
-        op = pp;
-      }
+      } else { op = pp; }
     }
-  } else {
-    op = in->n->gh->extra_drivers[0];
-  }
+  } else { op = in->n->gh->extra_drivers[0]; }
 
   bool root = true;
   if (op) {
     op->visited = 1;
     if (op->drive_type == 0) {
-      if (op->owner == 1) {
-        root = find_driver(g, op->u.i.in, op);
+      if (op->owner == 1 || op->extra_owner == 1) {
+        if (op->extra_owner == 0) { root = find_driver(g, op->u.i.in, op); }
+        else { root = find_driver(g, op->e, op); }
         if (root) {
           if (primary_flag == 1) { op->primary = 1; }
           if (op->u.i.in->extra_inst != 0) {
@@ -470,6 +471,7 @@ bool find_driver (graph *g, inst_node *in, port *p){
     return true;
   } else { return false; }
   ic = 0;
+
 }
 
 //Function to find multi drivers
@@ -558,6 +560,7 @@ void find_md (graph *g, node *n){
           if (gate_dr == 1) { create_mux(g, n, ip, o_port_collection, 1); }
           else { create_mux(g, n, ip, o_port_collection, 0); }
           for (auto op : o_port_collection) {
+            op->visited = 1;
             if (op->dir == 0) {
               n->decl[op->c]->type = 1;
               if (op->owner == 1) {

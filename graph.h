@@ -28,6 +28,7 @@ public:
   void setOwner(node *);
   void setOwner(inst_node *);
   void setOwner(gate *);
+  void setExtraOwner(inst_node *);
 
   act_connection *c;          //connection pointer of the port
 
@@ -40,6 +41,9 @@ public:
   unsigned int delay;         //0 - orig; N - number of FFs to delay
 
   unsigned int forced:2;      //0 - no; 1 - mk_hi; 2 - mk_lo;
+
+  unsigned int extra_owner:1; //enable extra owner
+  inst_node *e;               //extra owner
 
   unsigned int owner:2;       //0 - proc; 1 - inst node; 2 - gate
   
@@ -61,7 +65,12 @@ public:
   } u;
 };
 
-struct inst_node {
+class inst_node {
+public:
+
+  inst_node();
+  ~inst_node();
+
   Process *proc;          //need this to map to the orig node
   node *n;                //pointer to the original node
   node *par;              //pointer to the parent original node

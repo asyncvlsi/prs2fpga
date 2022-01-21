@@ -296,9 +296,7 @@ static void prefix_id_print (Scope *cs, node *n, ActId *id, int dir, std::string
   pid->sPrint(buf, 1024);
   gb += "\\";
   gb += buf;
-  if (n->decl[c]->port == 2) {
-    gb += "_out ";
-  }
+  if (n->decl[c]->port == 2) { gb += "_out "; }
   delete pid;
 
   return;
@@ -393,8 +391,9 @@ void print_prs (Scope *s, node *n, act_prs_lang_t *prs, int dir, std::string &gb
 void print_bi_dir (port *p, std::string &st)
 {
   if (p->bi == 1) {
-    if (p->u.i.in->extra_inst == 0) {
-      if (p->dir == 0) { st += "_out"; } else if (p->dir == 1) { st += "_in"; }
+    if (p->owner == 2 && p->extra_owner == 1) {
+      st += "_out";
+//      if (p->dir == 0) { st += "_in"; } else if (p->dir == 1) { st += "_out"; }
     } else {
       if (p->dir == 0) { st += "_out"; } else if (p->dir == 1) { st += "_in"; }
     }
@@ -649,7 +648,7 @@ void inst_arb(int dir, std::vector<port *> &fp, FILE *output){
   arb_num++;
 }
 
-void print_inst_port (port *p, int func, std::string &ins) 
+void print_inst_port (port *p, int func, int func2, std::string &ins) 
 {
 
   char buf[1024];
@@ -657,23 +656,21 @@ void print_inst_port (port *p, int func, std::string &ins)
   p->c->toid()->sPrint(buf,1024);
   ins += buf;
 
-  if (p->owner == 0 && p->u.p.n->proc) { print_bi_dir(p, ins); } 
-  if (p->owner == 1) { print_bi_dir(p, ins); } 
- 
+//  if (p->owner == 0 && p->u.p.n->proc) { print_bi_dir(p, ins); } 
+  if (func2 != 0) { print_bi_dir(p, ins); } 
+//  if (p->owner == 1 && p->u.i.in->n->proc != NULL) { print_bi_dir(p, ins); }
+
   if (p->drive_type != 0) {
     if (p->owner == 1 && (p->primary == 0 || p->u.i.in->extra_inst != 0)) {
       if (p->u.i.in->inst_name) {
-        ins += "_";
-        if (p->u.i.in->extra_inst == 0) {
+        if (p->owner == 1) {
+          ins += "_";
           ins += p->u.i.in->inst_name->getName();
-        } else {
-          ins += "md_";
-          ins += std::to_string(p->u.i.in->extra_inst);
         }
         if (p->u.i.in->array) { ins += p->u.i.in->array; }
       }
     }
-  } else if (p->owner == 2 && p->dir == 1) { ins += "_gate"; }
+  }
 
   if (func != 0) { print_dir_ending(func - 1, ins); }
   print_flag_ending(p, ins);
@@ -683,6 +680,8 @@ void print_inst_port (port *p, int func, std::string &ins)
 
 void print_inst_ports (inst_node *in, std::string &ins)
 {
+  int func2 = 0;
+
   char buf[1024];
 
   int jdr_num = 0;
@@ -698,22 +697,24 @@ void print_inst_ports (inst_node *in, std::string &ins)
   }
   for (auto i = 0; i < in->p.size(); i++) {
     in->p[i]->c->toid()->sPrint(buf,1024);
+    if (in->n->proc == NULL) { func2 = 0; }
+    else { func2 = 1; }
     if (in->p[i]->drive_type == 0) {
       ins += "\t,.\\";
-      print_inst_port(in->n->p[i], 0, ins);
+      print_inst_port(in->n->p[i], 0, func2, ins);
       ins += "\t(\\";
-      print_inst_port(in->p[i], 0, ins);
+      print_inst_port(in->p[i], 0, func2+1, ins);
       ins += " )\n";
     } else {
       for (auto j = 0; j < 4; j++) {
         ins += "\t,.\\";
-        print_inst_port(in->n->p[i], j+1, ins);
+        print_inst_port(in->n->p[i], j+1, func2, ins);
         if (in->extra_inst != 0 && in->p[i]->dir == 1) {
           ins += "_";
           ins += std::to_string(jdr_num);
         }
         ins += "\t(\\";
-        print_inst_port(in->p[i], j+1, ins);
+        print_inst_port(in->p[i], j+1, func2+1, ins);
         ins += " )\n";
       }
       if (in->p[i]->dir == 1) { jdr_num++; }
@@ -741,7 +742,8 @@ void print_inst_name (inst_node *in, std::string &ins)
     ins += in->inst_name->getName();
   } else {
     ins += "\\md_mux_";
-    ins += std::to_string(in->extra_inst);
+//    ins += std::to_string(in->extra_inst);
+    ins += std::to_string(in->n->extra_node);
     ins += " \\md_mux_",
     ins += std::to_string(in->extra_inst);
   }
@@ -853,16 +855,18 @@ void print_module_ports (node *n, std::string &mh)
 
 void print_module_header (node *n, std::string &mh)
 {
-  if (n->extra_node == 0) {
-    mh += "module \\";
-    mh += get_module_name(n->proc);
-    mh += " (\n";
-  } else if (n->extra_node != 0 && n->copy == 1) {
-    mh += "module \\";
-    mh += get_module_name(n->proc);
-    mh += "_";
-    mh += std::to_string(n->extra_node);
-    mh += " (\n";
+  if (n->proc) {
+    if (n->extra_node == 0) {
+      mh += "module \\";
+      mh += get_module_name(n->proc);
+      mh += " (\n";
+    } else if (n->extra_node != 0 && n->copy == 1) {
+      mh += "module \\";
+      mh += get_module_name(n->proc);
+      mh += "_";
+      mh += std::to_string(n->extra_node);
+      mh += " (\n";
+    }
   } else {
     mh += "module \\md_mux_";
     mh += std::to_string(n->extra_node);
