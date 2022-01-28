@@ -488,7 +488,7 @@ void print_gate_postfix(gate *gn, int dir, std::string &gb)
   return;
 }
 
-void print_else (gate *gn, std::string &gb)
+void print_else (Scope *cs, node *n, gate *gn, std::string &gb)
 {
   if (gn->type == 2 || gn->type == 3 || gn->type == 5) {
     char buf[1024];
@@ -497,9 +497,11 @@ void print_else (gate *gn, std::string &gb)
     gb += "\telse \\";
     if (gn->type == 5) { gb += " #1 \\"; }
     gb += buf;
+    if (n->decl[gn->id->Canonical(cs)]->port == 2) { gb += "_out"; }
     print_gate_postfix(gn, 0, gb);
     gb += " <= \\";
     gb += buf;
+    if (n->decl[gn->id->Canonical(cs)]->port == 2) { gb += "_out"; }
     print_gate_postfix(gn, 0, gb);
     if (gn->type == 2) { gb += "_reg ;\n\n"; }
     else { gb += " ;\n\n"; }
@@ -511,14 +513,17 @@ void print_gate (Scope *cs, node *n, gate *gn, std::string &gb)
 {
   char buf[1024];
   gn->id->sPrint(buf,1024);
+  int first = 0;
   bool skip = false;
   for (auto i = 0; i < 4; i++) {
     if ((gn->p_up[0] == NULL && i == 0) || (gn->p_dn[0] == NULL && i == 1)    ||
         (gn->w_p_up[0] == NULL && i == 2) || (gn->w_p_dn[0] == NULL && i == 3))  
         { skip = true; }
+    else { skip = false; }
     if (gn->drive_type == 0) {
       if (skip) { continue; }
-      if (i == 0) {
+      if (first == 0) {
+        first = 1;
         print_sh_keeper(gn, gb);
         print_header(gn,gb);
         gb += "\tif ("; 
@@ -542,6 +547,7 @@ void print_gate (Scope *cs, node *n, gate *gn, std::string &gb)
     if (gn->drive_type == 0) {
       gb += " ) \\";
       gb += buf;
+      if (n->decl[gn->id->Canonical(cs)]->port == 2) { gb += "_out"; }
       print_gate_postfix(gn, i, gb);
       if (i == 0 || i == 2) { gb += " <= 1'b1;\n"; } 
       else { gb += " <= 1'b0;\n"; }
@@ -554,7 +560,7 @@ void print_gate (Scope *cs, node *n, gate *gn, std::string &gb)
     }
   }
   if (gn->drive_type == 0) {
-    print_else(gn, gb);
+    print_else(cs, n, gn, gb);
   }
   return;
 }
