@@ -1,4 +1,5 @@
 #include <act/graph.h>
+#include <algorithm>
 
 //This part works on the multi drivers
 //either nested or neighboring
@@ -95,7 +96,7 @@ void append_gate (node *n, gate *g) {
 port *copy_port (port *p) {
   port *cp = new port;
   cp->c = p->c;
-  cp->visited = p->visited;
+  cp->visited = 0;
   cp->disable = 0;
   cp->dir = p->dir; 
   cp->bi = p->bi;
@@ -105,6 +106,7 @@ port *copy_port (port *p) {
   cp->primary = p->primary;
   cp->wire = p->wire;
   cp->extra_owner = p->extra_owner;
+  cp->extra_dir = p->extra_dir;
   cp->e = p->e;
   return cp;
 }
@@ -120,15 +122,15 @@ gate *copy_gate (gate *g) {
   for (auto pp : g->p) {
     port *cp;
     cp = copy_port(pp);
-    cp->owner = 2;
-    cp->u.g.g = cg;
+    cp->setOwner(cg);
     cg->p.push_back(cp);
   }
   for (auto pp : g->extra_drivers) {
     port *cp;
     cp = copy_port(pp);
-    cp->owner = 2;
-    cp->u.g.g = cg;
+    if (pp->owner == 0) { cp->setOwner(pp->u.p.n); }
+    else if (pp->owner == 1) { cp->setOwner(pp->u.i.in); }
+    else if (pp->owner == 2) { cp->setOwner(pp->u.g.g); }
     cg->extra_drivers.push_back(cp);   
   }
   for (auto netw : g->p_up) { cg->p_up.push_back(netw); }
@@ -148,7 +150,8 @@ inst_node *copy_inst(inst_node *in) {
     port *cp;
     cp = copy_port(pp);
     if (pp->owner == 0) { cp->setOwner(pp->u.p.n); } 
-    else if (pp->owner == 1) { cp->setOwner(pp->u.i.in); } 
+    else if (pp->owner == 1 && pp->extra_owner == 1) { cp->setOwner(pp->u.i.in); } 
+    else if (pp->owner == 1 && pp->extra_owner == 0) { cp->setOwner(cin); } 
     else { cp->setOwner(pp->u.g.g); }
     cin->p.push_back(cp);
   }
@@ -233,7 +236,7 @@ gate *create_extra_gate (port *ip, std::vector<port *> &p, int type) {
 
   port *gop = new port; 
   gop->c = ip->c;
-  gop->visited = 1;
+  gop->visited = 0;
   gop->disable = 0;
   id = ip->c->toid();
 
@@ -287,7 +290,7 @@ node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
   ep = new port;
 
   ep->c = ip->c;
-  ep->visited = 1;
+  ep->visited = 0;
   ep->disable = 0;
   ep->dir = 0;
   ep->bi = ip->bi;
@@ -348,13 +351,14 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
   eip->c = ip->c;
   eip->visited = 0;
   eip->disable = 0;
-  eip->dir = 0;
+  eip->dir = ip->dir;
   eip->bi = ip->bi;
   eip->drive_type = ip->drive_type;
   eip->delay = 0;
   eip->forced = 0;
   eip->primary = 0;
   eip->setExtraOwner(ein);
+  eip->setExtraDir(0);
   if (ip->owner == 0) { eip->setOwner(ip->u.p.n); } 
   else if (ip->owner == 1) { eip->setOwner(ip->u.i.in); }
   else { eip->setOwner(ip->u.g.g); }
@@ -367,12 +371,13 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
     eip->visited = 1;
     eip->disable = 0;
     eip->bi = pp->bi;
-    eip->dir = 1;
+    eip->dir = pp->dir;
     eip->drive_type = 1;
     eip->delay = 0;
     eip->forced = 0;
     eip->primary = 0;
     eip->setExtraOwner(ein);
+    eip->setExtraDir(1);
     if (pp->owner == 0) { eip->setOwner(pp->u.p.n); } 
     else if (pp->owner == 1) { eip->setOwner(pp->u.i.in); } 
     else { eip->setOwner(pp->u.g.g); }
@@ -391,7 +396,6 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
 //creation and copying of all necessary
 //elements
 void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) {
-//fprintf(stdout, "%s %i\n",n->proc->getName(), extra_num);
   node *en;
   inst_node *ein;
   en = create_extra_node(ip, p, type);
@@ -416,19 +420,20 @@ bool find_driver (graph *g, inst_node *in, port *p){
   }
 
   //Find port index inside the instance scope
-  port *ip;
+  port *ip = NULL;
+  int iport = 0;
   if (in->extra_inst == 0) {
-    int iport = 0;
     for (auto pp : in->p) {
-      if (pp == p) { break; }
+      if (pp == p) {
+        ip = in->n->p[iport];
+        break;
+      }
       iport++;
     }
-    ip = in->n->p[iport];
   } else { ip = in->n->p[0]; }
 
   //Traverse port a list of ports corresponding to the
   //case act_connection as the port in the arg list
-  int ic = 0;
   port *op = NULL;
   std::vector<port *> npc;
   int primary_flag = 0;
@@ -437,11 +442,13 @@ bool find_driver (graph *g, inst_node *in, port *p){
 
   if (in->extra_inst == 0) {
     for (auto pp : in->n->cp[ip->c]) {
-      if (pp->owner == 0 || pp->dir == 1 || pp->visited == 1) { continue; }
-      if (pp->extra_owner == 1) {
+      if (pp->extra_owner == 0) {
+        if (pp->owner == 0 || pp->dir == 1 || pp->visited == 1) { continue; }
+        op = pp;
+      } else {
         op = pp;
         break;
-      } else { op = pp; }
+      }
     }
   } else { op = in->n->gh->extra_drivers[0]; }
 
@@ -454,7 +461,7 @@ bool find_driver (graph *g, inst_node *in, port *p){
         else { root = find_driver(g, op->e, op); }
         if (root) {
           if (primary_flag == 1) { op->primary = 1; }
-          if (op->u.i.in->extra_inst != 0) {
+          if (op->extra_owner == 1) {
             std::vector<port*> mini_mux = {op};
             create_mux(g, in->n, op, mini_mux, 0);
           }
@@ -470,8 +477,66 @@ bool find_driver (graph *g, inst_node *in, port *p){
     } else { ip->drive_type = 1; }
     return true;
   } else { return false; }
-  ic = 0;
 
+}
+
+void collect_driven_ports(std::vector<port*> &con, std::vector<port *> &col)
+{
+  int i_flag_1 = 0;
+  int i_flag_2 = 0;
+  int i_flag_3 = 0;
+  int i_flag_4 = 0;
+  int i_flag_5 = 0;
+  int i_flag_6 = 0;
+  int i_flag_7 = 0;
+  int i_flag_8 = 0;
+
+  port *tmp;
+
+  for (auto pp : con) {
+    tmp = NULL;
+    if (pp->dir == 1 && pp->owner != 0) {
+      if (pp->bi == 0 && i_flag_1 == 0 && pp->drive_type == 0) {
+        i_flag_1 = 1; i_flag_5 = 1;
+        tmp = pp;
+      } else 
+      if (pp->bi == 0 && i_flag_2 == 0 && pp->drive_type == 1) {
+        i_flag_2 = 1; i_flag_6 = 1;
+        tmp = pp;
+      } else
+      if (pp->bi == 1 && i_flag_3 == 0 && pp->drive_type == 0) {
+        i_flag_3 = 1; i_flag_6 = 1;
+        tmp = pp;
+      } else
+      if (pp->bi == 1 && i_flag_4 == 0 && pp->drive_type == 1) {
+        i_flag_4 = 1; i_flag_8 = 1;
+        tmp = pp;
+      }
+    } 
+    else if (pp->dir == 0 && pp->owner == 0) {
+      if (pp->bi == 0 && i_flag_5 == 0 && pp->drive_type == 0) {
+        i_flag_1 = 1; i_flag_5 = 1;
+        tmp = pp;
+      } else
+      if (pp->bi == 0 && i_flag_6 == 0 && pp->drive_type == 1) {
+        i_flag_2 = 1; i_flag_6 = 1;
+        tmp = pp;
+      } else
+      if (pp->bi == 1 && i_flag_7 == 0 && pp->drive_type == 0) {
+        i_flag_3 = 1; i_flag_7 = 1;
+        tmp = pp;
+      } else
+      if (pp->bi == 1 && i_flag_8 == 0 && pp->drive_type == 1) {
+        i_flag_4 = 1; i_flag_8 = 1;
+        tmp = pp;
+      }
+    }
+    if (std::find(col.begin(),col.end(),tmp) == col.end() && tmp != NULL) {
+      col.push_back(tmp);
+    } 
+  }
+
+  return;
 }
 
 //Function to find multi drivers
@@ -504,50 +569,17 @@ void find_md (graph *g, node *n){
   std::vector<port *> i_port_collection;
 
   int o_num = 0;
-  int i_flag_1 = 0;
-  int i_flag_2 = 0;
-  int i_flag_3 = 0;
-  int i_flag_4 = 0;
   int gate_dr = 0;
 
   for (auto pair : n->cp) {
     //multi driver case
     if (pair.second.size() > 2) {
       o_port_collection.clear();
-      i_port_collection.clear();
       o_num = 0;
-      i_flag_1 = 0;
-      i_flag_2 = 0;
-      i_flag_3 = 0;
-      i_flag_4 = 0;
-      gate_dr = 0;
-      for (auto pp : pair.second) {
-        if (pp->dir == 1 && pp->owner != 0) {
-          if (pp->bi == 0 && i_flag_1 == 0 && pp->drive_type == 0) {
-            i_flag_1 = 1;
-            i_port_collection.push_back(pp);
-            continue;
-          }
-          if (pp->bi == 0 && i_flag_2 == 0 && pp->drive_type == 1) {
-            i_flag_2 = 1;
-            i_port_collection.push_back(pp);
-            continue;
-          }
-          if (pp->bi == 1 && i_flag_3 == 0 && pp->drive_type == 0) {
-            i_flag_3 = 1;
-            i_port_collection.push_back(pp);
-            continue;
-          }
-          if (pp->bi == 1 && i_flag_4 == 0 && pp->drive_type == 1) {
-            i_flag_4 = 1;
-            i_port_collection.push_back(pp);
-            continue;
-          }
-        }
-      }
+      collect_driven_ports(pair.second, i_port_collection);
       for (auto pp : pair.second) {
         if ((pp->dir == 0 && pp->owner != 0)
-            | (pp->dir == 1 && pp->owner == 0)) { 
+          ){
           o_num++; 
           o_port_collection.push_back(pp);
           if (pp->owner == 2 && (pp->u.g.g->type == 1 || pp->u.g.g->type == 3)) { 
@@ -561,7 +593,7 @@ void find_md (graph *g, node *n){
           else { create_mux(g, n, ip, o_port_collection, 0); }
           for (auto op : o_port_collection) {
             op->visited = 1;
-            if (op->dir == 0) {
+            if (op->dir == 0 && op->drive_type == 0) {
               n->decl[op->c]->type = 1;
               if (op->owner == 1) {
                 root = find_driver(g, op->u.i.in, op);
@@ -579,11 +611,11 @@ void find_md (graph *g, node *n){
             mv->type = 2;
           }
         }
-        for (auto pp : pair.second) {
-          pp->wire = 1;
-        }
+        for (auto pp : pair.second) { pp->wire = 1; }
       }
     }
+    i_port_collection.clear();
+    o_port_collection.clear();
   }
 
   //Walk through instances and check if their primary ios were
@@ -592,21 +624,19 @@ void find_md (graph *g, node *n){
   //resolved. Even if there is no multiple drivers the source driver
   //should be modified to drive-type 1
   for (auto in = n->cgh; in; in = in->next) {
-    if (in->extra_inst == 0) {
-      for (auto i = 0; i < in->n->p.size(); i++) {
-        if (in->n->p[i]->drive_type != in->p[i]->drive_type) { 
-          in->p[i]->drive_type = in->n->p[i]->drive_type;
-          for (auto pp : n->cp[in->p[i]->c]) {
-            if (pp->dir == 1 | pp->drive_type != 0) { continue; }
-            if (pp->owner == 0) { pp->drive_type = 1; } 
-            else if (pp->owner == 1) {
-              if (pp->u.i.in->extra_inst != 0) { continue; }
-              root = find_driver(g, pp->u.i.in, pp);
-              if (root) { pp->drive_type = 1; }
-            } else if (pp->owner == 2) {
-              pp->drive_type = 1;
-              pp->u.g.g->drive_type = 1;
-            }
+    for (auto i = 0; i < in->n->p.size(); i++) {
+      if (in->n->p[i]->drive_type != in->p[i]->drive_type) { 
+        in->p[i]->drive_type = in->n->p[i]->drive_type;
+        for (auto pp : n->cp[in->p[i]->c]) {
+          if (pp->dir == 1 | pp->drive_type != 0) { continue; }
+          if (pp->owner == 0) { pp->drive_type = 1; } 
+          else if (pp->owner == 1) {
+            if (pp->u.i.in->extra_inst != 0) { continue; }
+            root = find_driver(g, pp->u.i.in, pp);
+            if (root) { pp->drive_type = 1; }
+          } else if (pp->owner == 2) {
+            pp->drive_type = 1;
+            pp->u.g.g->drive_type = 1;
           }
         }
       }
@@ -628,7 +658,6 @@ void add_md (project *p) {
   int remap = 0;
 
   for (auto nn : graph_copy){
-fprintf(stdout, "=============================\n%s\n", nn->proc->getName());
     find_md(g, nn);
   }
 

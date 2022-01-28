@@ -29,6 +29,7 @@ public:
   void setOwner(inst_node *);
   void setOwner(gate *);
   void setExtraOwner(inst_node *);
+  void setExtraDir(int);
 
   act_connection *c;          //connection pointer of the port
 
@@ -44,6 +45,7 @@ public:
 
   unsigned int extra_owner:1; //enable extra owner
   inst_node *e;               //extra owner
+  unsigned int extra_dir:1;
 
   unsigned int owner:2;       //0 - proc; 1 - inst node; 2 - gate
   

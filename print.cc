@@ -296,7 +296,7 @@ static void prefix_id_print (Scope *cs, node *n, ActId *id, int dir, std::string
   pid->sPrint(buf, 1024);
   gb += "\\";
   gb += buf;
-  if (n->decl[c]->port == 2) { gb += "_out "; }
+  if (n->decl[c]->port == 2) { gb += "_in "; }
   delete pid;
 
   return;
@@ -390,14 +390,8 @@ void print_prs (Scope *s, node *n, act_prs_lang_t *prs, int dir, std::string &gb
 
 void print_bi_dir (port *p, std::string &st)
 {
-  if (p->bi == 1) {
-    if (p->owner == 2 && p->extra_owner == 1) {
-      st += "_out";
-//      if (p->dir == 0) { st += "_in"; } else if (p->dir == 1) { st += "_out"; }
-    } else {
-      if (p->dir == 0) { st += "_out"; } else if (p->dir == 1) { st += "_in"; }
-    }
-  }
+  if (p->dir == 0) { st += "_out"; } 
+  else if (p->dir == 1) { st += "_in"; }
 
   return; 
 }
@@ -517,8 +511,13 @@ void print_gate (Scope *cs, node *n, gate *gn, std::string &gb)
 {
   char buf[1024];
   gn->id->sPrint(buf,1024);
+  bool skip = false;
   for (auto i = 0; i < 4; i++) {
+    if ((gn->p_up[0] == NULL && i == 0) || (gn->p_dn[0] == NULL && i == 1)    ||
+        (gn->w_p_up[0] == NULL && i == 2) || (gn->w_p_dn[0] == NULL && i == 3))  
+        { skip = true; }
     if (gn->drive_type == 0) {
+      if (skip) { continue; }
       if (i == 0) {
         print_sh_keeper(gn, gb);
         print_header(gn,gb);
@@ -532,20 +531,27 @@ void print_gate (Scope *cs, node *n, gate *gn, std::string &gb)
       if (gn->type == 4 || gn->type == 5) { gb += "#1 \\"; }
       else { gb += "\\"; }
       gb += buf;
+      if (n->decl[gn->id->Canonical(cs)]->port == 2) { gb += "_out"; }
       print_gate_postfix(gn, i, gb);
       gb += " <= ";
     }
-    if (i == 0)      { print_condition(cs, n, gn->p_up,1, gb); }
-    else if (i == 1) { print_condition(cs, n, gn->p_dn,0, gb); }
-    else if (i == 2) { print_condition(cs, n, gn->w_p_up,1, gb); }
-    else if (i == 3) { print_condition(cs, n, gn->w_p_dn,0, gb); }
+    if (gn->p_up[0] != NULL && i == 0) { print_condition(cs, n, gn->p_up,1, gb); }
+    if (gn->p_dn[0] != NULL && i == 1) { print_condition(cs, n, gn->p_dn,0, gb); }
+    if (gn->w_p_up[0] != NULL && i == 2) { print_condition(cs, n, gn->w_p_up,1, gb); }
+    if (gn->w_p_dn[0] != NULL && i == 3) { print_condition(cs, n, gn->w_p_dn,0, gb); }
     if (gn->drive_type == 0) {
       gb += " ) \\";
       gb += buf;
       print_gate_postfix(gn, i, gb);
       if (i == 0 || i == 2) { gb += " <= 1'b1;\n"; } 
       else { gb += " <= 1'b0;\n"; }
-    } else { gb += " ? 1'b1 : 1'b0;\n"; }
+    } else {
+      if ((gn->p_up[0] != NULL && i == 0)    || 
+          (gn->p_dn[0] != NULL && i == 1)    ||
+          (gn->w_p_up[0] != NULL && i == 2)  ||
+          (gn->w_p_dn[0] != NULL && i == 3))  { gb += " ? 1'b1 : 1'b0;\n"; }
+      else { gb += " 1'b0;\n"; }
+    }
   }
   if (gn->drive_type == 0) {
     print_else(gn, gb);
@@ -656,14 +662,12 @@ void print_inst_port (port *p, int func, int func2, std::string &ins)
   p->c->toid()->sPrint(buf,1024);
   ins += buf;
 
-//  if (p->owner == 0 && p->u.p.n->proc) { print_bi_dir(p, ins); } 
-  if (func2 != 0) { print_bi_dir(p, ins); } 
-//  if (p->owner == 1 && p->u.i.in->n->proc != NULL) { print_bi_dir(p, ins); }
+  if (func2 != 0 && p->bi) { print_bi_dir(p, ins); } 
 
   if (p->drive_type != 0) {
     if (p->owner == 1 && (p->primary == 0 || p->u.i.in->extra_inst != 0)) {
       if (p->u.i.in->inst_name) {
-        if (p->owner == 1) {
+        if (p->owner == 1 && p->dir == 0) {
           ins += "_";
           ins += p->u.i.in->inst_name->getName();
         }
@@ -672,6 +676,8 @@ void print_inst_port (port *p, int func, int func2, std::string &ins)
     }
   }
 
+  if (p->extra_owner == 0 && p->owner == 1 && 
+      p->u.i.in->par->decl[p->c]->port == 2) { print_bi_dir(p, ins); }
   if (func != 0) { print_dir_ending(func - 1, ins); }
   print_flag_ending(p, ins);
 
@@ -709,7 +715,7 @@ void print_inst_ports (inst_node *in, std::string &ins)
       for (auto j = 0; j < 4; j++) {
         ins += "\t,.\\";
         print_inst_port(in->n->p[i], j+1, func2, ins);
-        if (in->extra_inst != 0 && in->p[i]->dir == 1) {
+        if (in->extra_inst != 0 && in->p[i]->extra_dir == 1) {
           ins += "_";
           ins += std::to_string(jdr_num);
         }
@@ -717,7 +723,7 @@ void print_inst_ports (inst_node *in, std::string &ins)
         print_inst_port(in->p[i], j+1, func2+1, ins);
         ins += " )\n";
       }
-      if (in->p[i]->dir == 1) { jdr_num++; }
+      if (in->p[i]->extra_dir == 1) { jdr_num++; }
     }
   }
 
@@ -742,7 +748,6 @@ void print_inst_name (inst_node *in, std::string &ins)
     ins += in->inst_name->getName();
   } else {
     ins += "\\md_mux_";
-//    ins += std::to_string(in->extra_inst);
     ins += std::to_string(in->n->extra_node);
     ins += " \\md_mux_",
     ins += std::to_string(in->extra_inst);
@@ -788,6 +793,7 @@ void print_vars (node *n, std::string &vs)
       v.first->toid()->sPrint(buf,1024);
       vs += buf;
       print_var_postfix(v.second, i, vs);
+      if (v.second->type == 2) { vs += " = 1'b0"; }
       vs += " ;\n";
     }
   }
@@ -811,7 +817,7 @@ void print_module_port (port *p, int &cnt, std::string &mh)
       if (p->wire == 0) { mh += "reg"; }
       mh += "\t\t\\";
       mh += buf;
-      if (p->u.p.n->proc) { print_bi_dir(p, mh); }
+      if (p->u.p.n->proc && p->bi) { print_bi_dir(p, mh); }
       print_port_postfix(p, i, mh);
       mh += "\n";
     }
@@ -819,7 +825,7 @@ void print_module_port (port *p, int &cnt, std::string &mh)
     for (auto i = 0; i < cps; i++) {
       mh += "\t,input\t\t\t\\";
       mh += buf;
-      if (p->u.p.n->proc) { print_bi_dir(p, mh); }
+      if (p->u.p.n->proc && p->bi) { print_bi_dir(p, mh); }
       print_port_postfix(p, i, mh);
       if (p->u.p.n->extra_node != 0 && p->u.p.n->proc == NULL) { 
         mh += "_";

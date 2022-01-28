@@ -15,6 +15,7 @@ port::port(){
   delay = 0;
   forced = 0;
   extra_owner = 0;
+  extra_dir = 0;
   owner = 0;
   primary = 0;
   wire = 0;
@@ -28,6 +29,11 @@ void port::setExtraOwner(inst_node *in)
 {
   extra_owner = 1;
   e = in;
+}
+
+void port::setExtraDir(int i)
+{
+  extra_dir = i;
 }
 
 void port::setOwner(node *n)

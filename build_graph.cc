@@ -42,7 +42,7 @@ bool is_bidir (act_boolean_netlist_t *bnl, act_connection *pc)
 {
   act_booleanized_var_t *bv = get_bool_var(bnl, pc);
 
-  return bv->input == 1 && bv->output == 1;
+  return bv->input == 1 && bv->output == 1 && bv->used;
 }
 
 //Function to compare two ports' owners
@@ -484,7 +484,7 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
             in->proc = i_proc;
             in->extra_inst = 0;
             for (int j = 0; j < A_LEN(sub->ports); j++) {
-              if (sub->ports[j].omit) continue;
+              if (sub->ports[j].omit) { continue; }
               pc = bnl->instports[iport]->toid()->Canonical(cs);
               if (is_input(sub, sub->ports[j].c)) {
                 port *pp = new port;
@@ -528,7 +528,7 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
         in->proc = i_proc;
         in->extra_inst = 0;
         for (int j = 0; j < A_LEN(sub->ports); j++) {
-          if (sub->ports[j].omit) continue;
+          if (sub->ports[j].omit) { continue; }
           pc = bnl->instports[iport]->toid()->Canonical(cs);
           if (is_input(sub, sub->ports[j].c)) {
             port *pp = new port;
@@ -705,14 +705,12 @@ void declare_vars (Process *p, graph *g)
     while (b = phash_iter_next(bnl->cH, &hiter)) {
       act_booleanized_var_t *bv;
       bv = (act_booleanized_var_t *)b->v;
+      if (bv->used == 0) { continue; }
       var *fv = new var;
       if (bv->isport == 1 || bv->isglobal == 1) {
         fv->type = 0;
-        if (bv->input == 1 && bv->output == 1) {
-          fv->port = 2;
-        } else {
-          fv->port = 1;
-        }
+        if (bv->input == 1 && bv->output == 1) { fv->port = 2; } 
+        else { fv->port = 1; }
       } else {
         fv->type = 2;
         fv->port = 0;
@@ -731,6 +729,7 @@ void declare_vars (Process *p, graph *g)
       n->decl[vc] = fv;
     }
   }
+  return;
 }
 
 //Function to determine type of an output port
