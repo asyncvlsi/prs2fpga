@@ -10,7 +10,8 @@ unsigned int extra_num = 1;
 //Function to update connection map in 
 //the process node after adding md mux
 //instance
-void update_cp (node *n, port *p) {
+void update_cp (node *n, port *p) 
+{
   std::vector<port *> new_ports;
   for (auto pp : n->cp[p->c]) {
     if (pp->dir == 1 || pp->owner == 0) {
@@ -25,7 +26,8 @@ void update_cp (node *n, port *p) {
 
 //Function to append md multiplexing node
 //to the main circuit graph
-void append_graph (graph *g, node *n) {
+void append_graph (graph *g, node *n) 
+{
   if (g->hd) {
     g->tl->next = n;
     g->tl = n;
@@ -38,7 +40,8 @@ void append_graph (graph *g, node *n) {
   return;
 }
 
-void prepend_graph (graph *g, node *n) {
+void prepend_graph (graph *g, node *n) 
+{
   if (g->hd) {
     n->next = g->hd;
     g->hd = n;
@@ -66,7 +69,8 @@ void update_graph (graph *g, node *n)
 
 //Function to append md multiplexing node 
 //to the list of instances in the node
-void append_inst (node *n, inst_node *in) {
+void append_inst (node *n, inst_node *in) 
+{
   if (n->cgh) {
     n->cgt->next = in;
     n->cgt = in;
@@ -80,7 +84,8 @@ void append_inst (node *n, inst_node *in) {
   return;
 }
 
-void append_gate (node *n, gate *g) {
+void append_gate (node *n, gate *g) 
+{
   if (n->gh) {
     n->gt->next = g;
     n->gt = g;
@@ -93,7 +98,8 @@ void append_gate (node *n, gate *g) {
   return;
 }
 
-port *copy_port (port *p) {
+port *copy_port (port *p) 
+{
   port *cp = new port;
   cp->c = p->c;
   cp->visited = 0;
@@ -111,7 +117,8 @@ port *copy_port (port *p) {
   return cp;
 }
 
-gate *copy_gate (gate *g) {
+gate *copy_gate (gate *g) 
+{
   gate *cg = new gate;
   cg->id = g->id;
   cg->type = g->type;
@@ -141,7 +148,8 @@ gate *copy_gate (gate *g) {
   return cg;  
 }
 
-inst_node *copy_inst(inst_node *in) {
+inst_node *copy_inst(inst_node *in) 
+{
   inst_node *cin = new inst_node;
   cin->proc = in->proc;
   cin->n = in->n;
@@ -165,7 +173,8 @@ inst_node *copy_inst(inst_node *in) {
 
 //Function to copy process node and modify its ports because 
 //not every instance of the process is a part of the multi driver
-node *copy_node (node *n) {
+node *copy_node (node *n) 
+{
   node *cn = new node;
   if (n->proc) { cn->proc = n->proc; } 
   else { cn->proc = NULL; }
@@ -276,7 +285,8 @@ gate *create_extra_gate (port *ip, std::vector<port *> &p, int type) {
 //Function to create a node to manage multi drivers
 //i.e. multiplexor
 //proc = NULL, extra = 1, only one gate
-node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
+node *create_extra_node (port *ip, std::vector<port *> &p, int type) 
+{
   std::vector<port *> new_ports;
   int o_num = 0;
   node *pn = new node;
@@ -338,7 +348,8 @@ node *create_extra_node (port *ip, std::vector<port *> &p, int type) {
 }
 
 //Function to create instances of the extra nodes
-inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &p) {
+inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &p) 
+{
   int o_num = 0;
   inst_node *ein = new inst_node;
   ein->proc = NULL;
@@ -395,7 +406,8 @@ inst_node *create_extra_inst (node *pn, node *n, port *ip, std::vector<port *> &
 //Function to add mutiplexer includes
 //creation and copying of all necessary
 //elements
-void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) {
+void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) 
+{
   node *en;
   inst_node *ein;
   en = create_extra_node(ip, p, type);
@@ -410,7 +422,8 @@ void create_mux (graph *g, node *n, port *ip, std::vector<port *> &p, int type) 
 //down in the hierarchy
 //Arguments are the circuit graph, instance inside which
 //the gate is sitting and the output port we are looking for
-bool find_driver (graph *g, inst_node *in, port *p){
+bool find_driver (graph *g, inst_node *in, port *p)
+{
  
   if (in->n->copy == 0) {
     node *cn;
@@ -549,7 +562,8 @@ void collect_driven_ports(std::vector<port*> &con, std::vector<port *> &col)
 //    down the hierarchy to find the source driving gate
 //    and update its type as well as all ports connecting
 //    to it
-void find_md (graph *g, node *n){
+void find_md (graph *g, node *n)
+{
 
   bool root = true;
 
@@ -594,7 +608,6 @@ void find_md (graph *g, node *n){
           for (auto op : o_port_collection) {
             op->visited = 1;
             if (op->dir == 0 && op->drive_type == 0) {
-              n->decl[op->c]->type = 1;
               if (op->owner == 1) {
                 root = find_driver(g, op->u.i.in, op);
                 if (root) { op->drive_type = 1; }
@@ -606,9 +619,10 @@ void find_md (graph *g, node *n){
             } else {
               if (op->owner == 0) { op->drive_type = 1; }
             }
+            op->primary = 0;
             var *mv = n->decl[op->c];
             mv->drive_type = 1;
-            mv->type = 2;
+            if (mv->type == 1) { mv->type = 0; }
           }
         }
         for (auto pp : pair.second) { pp->wire = 1; }
@@ -645,6 +659,30 @@ void find_md (graph *g, node *n){
 
 };
 
+//Function to connect bidirectional ios in the instances
+//to itself because of the very flexible ACT syntax.
+void self_connect(graph *g)
+{
+  std::vector<inst_node *> tmp;
+  std::vector<inst_node *>::iterator tmp_i;
+  for (auto n = g->hd; n; n = n->next) {
+    for (auto pair : n->cp) {
+      for (auto pp : pair.second) {
+        if (pp->owner == 0 || pp->owner == 2 || 
+            pp->bi == 0 || pp->drive_type != 0) { tmp.clear(); break; }
+        else { tmp.push_back(pp->u.i.in); }
+      }
+      sort(tmp.begin(),tmp.end());
+      tmp_i = std::unique(tmp.begin(), tmp.end());
+      tmp.resize(std::distance(tmp.begin(),tmp_i));
+      if (tmp.size() == 1) {
+        for (auto pp : pair.second) { pp->dir = 0; }
+      }
+      tmp.clear();
+    }
+  }
+}
+
 void add_md (project *p) {
 
   graph *g = p->g;
@@ -660,6 +698,7 @@ void add_md (project *p) {
   for (auto nn : graph_copy){
     find_md(g, nn);
   }
+  self_connect(g);
 
 }
 

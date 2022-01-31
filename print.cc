@@ -668,7 +668,9 @@ void print_inst_port (port *p, int func, int func2, std::string &ins)
   p->c->toid()->sPrint(buf,1024);
   ins += buf;
 
-  if (func2 != 0 && p->bi) { print_bi_dir(p, ins); } 
+  if ((func2 != 0 && p->bi) ||
+        (p->extra_owner == 0 && p->owner == 1 && 
+          p->u.i.in->par->decl[p->c]->port == 2)) { print_bi_dir(p, ins); }
 
   if (p->drive_type != 0) {
     if (p->owner == 1 && (p->primary == 0 || p->u.i.in->extra_inst != 0)) {
@@ -682,8 +684,6 @@ void print_inst_port (port *p, int func, int func2, std::string &ins)
     }
   }
 
-  if (p->extra_owner == 0 && p->owner == 1 && 
-      p->u.i.in->par->decl[p->c]->port == 2) { print_bi_dir(p, ins); }
   if (func != 0) { print_dir_ending(func - 1, ins); }
   print_flag_ending(p, ins);
 
@@ -790,7 +790,7 @@ void print_vars (node *n, std::string &vs)
   int cps = 1;
 
   for (auto v : n->decl) {
-    if (v.second->type == 0) { continue; }
+    if (v.second->port != 0 || v.second->type == 0) { continue; }
     if (v.second->drive_type != 0) { cps = 4; }
     else { cps = 1; }
     for (auto i = 0; i < cps; i++) {
@@ -798,6 +798,7 @@ void print_vars (node *n, std::string &vs)
       else if (v.second->type == 2) { vs += "reg \\"; }
       v.first->toid()->sPrint(buf,1024);
       vs += buf;
+      if (v.second->port == 2) { vs += "_out"; }
       print_var_postfix(v.second, i, vs);
       if (v.second->type == 2) { vs += " = 1'b0"; }
       vs += " ;\n";

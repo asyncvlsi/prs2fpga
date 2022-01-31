@@ -569,7 +569,6 @@ void add_instances (Scope *cs, act_boolean_netlist_t *bnl, node *par) {
 void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
 
   act_connection *pc;
-
   //adding internal ports to process node 
   for (int i = 0; i < A_LEN(bnl->ports); i++) {
     if (bnl->ports[i].omit) continue;
@@ -720,11 +719,14 @@ void declare_vars (Process *p, graph *g)
       fv->delay = 0;
 
       act_connection *vc = bv->id->toid()->Canonical(cs);
-      for (auto pp : n->cp[vc]) {
-        if (pp->owner == 1) { tmp = 1; }
-        else { tmp = 0; break; }
+      if (fv->type != 0) {
+        for (auto pp : n->cp[vc]) {
+          if (pp->owner == 1) { tmp = 1; }
+          else if (pp->owner == 2 && pp->dir == 1) { tmp = 1; }
+          else if (pp->owner == 2 && pp->dir == 0) { tmp = 2; break; }
+        }
+        fv->type = tmp;
       }
-      if (tmp == 1) { fv->type = 1; }
 
       n->decl[vc] = fv;
     }
@@ -732,8 +734,56 @@ void declare_vars (Process *p, graph *g)
   return;
 }
 
+//Function to find bidirecitonal ports which are
+//visible as unidirectional at the current scope
+//The main case is an instance with direct connection
+//to the primary ports
+void find_bi (graph *g)
+{
+  for (auto n = g->hd; n; n = n->next) {
+    int flag = 0;
+    int idx = 0;
+    port *pp;
+    for (auto i = 0; i < n->p.size(); i++) {
+      pp = n->p[i];
+      if (pp->bi) { idx++; continue; }
+      for (auto ip : n->cp[pp->c]) {
+        if (ip == pp) { continue; }
+        if (ip->owner == 1 && ip->bi == 1) { flag = 1; break; }
+      }
+      if (flag == 1) {
+        port *np = new port;
+        np->c = pp->c;
+        if (pp->dir == 0) { np->dir = 1; }
+        else { np->dir = 0; }
+        np->setOwner(n);
+        np->bi = 1;
+        pp->bi = 1;
+        n->cp[np->c].push_back(np);
+        n->p.push_back(np);
+        for (auto in : n->iv) {
+          port *nip = new port;
+          nip->c = in->p[idx]->c;
+          nip->dir = np->dir;
+          nip->bi = 1;
+          in->p[idx]->bi = 1;
+          nip->setOwner(in);
+          in->p.push_back(nip);
+          in->par->cp[nip->c].push_back(nip);
+        }
+        flag = 0;
+      }
+      idx++;
+    }
+  }
+  return;
+}
+
 //Function to determine type of an output port
-//either wire or reg
+//either wire or reg and find direct connection 
+//between inst port and primary port to avoid 
+//printing inst name in the port id to enforce 
+//uniqueness
 void declare_ports (graph *g)
 {
   for (auto n = g->hd; n; n = n->next) {
@@ -742,7 +792,10 @@ void declare_ports (graph *g)
       for (auto in = n->cgh; in; in = in->next) {
         for (auto ip : in->p) {
           if (ip->dir == 1) { continue; }
-          if (ip->c == pp->c) { pp->wire = 1; }
+          if (ip->c == pp->c) {
+            pp->wire = 1; 
+            ip->primary = 1;
+          }
         }
       }
     }
@@ -765,6 +818,7 @@ void build_project_graph (project *proj, Act *a, Process *p) {
   build_graph(p, g);
   map_instances(g);
   map_cp(g);
+  find_bi(g);
   map_io(g);
   declare_vars(p, g);
   declare_ports(g);
