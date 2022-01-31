@@ -960,7 +960,7 @@ void add_timing (project *proj) {
           if (p == cp) {
             continue;
           }
-          if (cmp_owner(p,cp) == true && cp->dir == 0) {
+          if (cmp_owner(p,cp) == true && cp->dir == 0 && cp->bi == 0) {
             p->delay = 1;
           } else {
             int cur = 0;
@@ -975,7 +975,7 @@ void add_timing (project *proj) {
           if (p == cp) {
             continue;
           }
-          if (cmp_owner(p,cp) == true && cp->dir == 0) {
+          if (cmp_owner(p,cp) == true && cp->dir == 0 && cp->bi == 0) {
             p->delay = 1;
           } else {
             int cur = 0;
