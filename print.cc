@@ -12,6 +12,15 @@ unsigned int arb_num = 0;
 
 std::vector<port *> delayed_ports;
 
+void print_bi_dir (port *p, std::string &st)
+{
+  if (p->dir == 0) { st += "_out"; } 
+  else if (p->dir == 1) { st += "_in"; }
+
+  return; 
+}
+
+
 void print_ff (int func, std::string &ff) 
 {
   ff += "`timescale 1ns/1ps\n\n";
@@ -45,7 +54,7 @@ void print_ff (int func, std::string &ff)
   ff += "endmodule\n\n";
 }
 
-void print_delay (port *p, std::string &dd) 
+void print_delay (node *n, port *p, std::string &dd) 
 {
   char buf[1024];
 
@@ -58,9 +67,11 @@ void print_delay (port *p, std::string &dd)
   dd += "\n\t.in(\\";
   p->c->toid()->sPrint(buf,1024);
   dd += buf;
+  if (n->decl[p->c]->port == 2 || p->bi == 1) { print_bi_dir(p, dd); }
   dd += "_delay ),\n";
   dd += "\t.out(\\";
   dd += buf;
+  if (n->decl[p->c]->port == 2 || p->bi == 1) { print_bi_dir(p, dd); }
   dd += " )\n";
   dd += " );\n\n";
   ffd_num++;
@@ -386,14 +397,6 @@ void print_prs (Scope *s, node *n, act_prs_lang_t *prs, int dir, std::string &gb
     gb += " )";
   }
   return;
-}
-
-void print_bi_dir (port *p, std::string &st)
-{
-  if (p->dir == 0) { st += "_out"; } 
-  else if (p->dir == 1) { st += "_in"; }
-
-  return; 
 }
 
 void print_flag_ending (port *p, std::string &flag_e) 
@@ -987,7 +990,7 @@ void print_verilog (project *proj, FILE *output) {
     fprintf(output, "%s", info.c_str());
     info.clear();
     for (auto dp : delayed_ports) {
-      print_delay(dp, delay);
+      print_delay(n, dp, delay);
       fprintf(output, "%s",delay.c_str());
       delay.clear();
     }
