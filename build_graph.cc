@@ -722,7 +722,7 @@ void declare_vars (Process *p, graph *g)
     phash_iter_t hiter;
     phash_bucket_t *b;
     phash_iter_init (bnl->cH, &hiter);
-    while (b = phash_iter_next(bnl->cH, &hiter)) {
+    while ((b = phash_iter_next(bnl->cH, &hiter))) {
       act_booleanized_var_t *bv;
       bv = (act_booleanized_var_t *)b->v;
       if (bv->used == 0) { continue; }

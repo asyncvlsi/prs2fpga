@@ -53,11 +53,11 @@ void usage () {
   fprintf(stdout, "=============================================================================================\n");
   logo();
   fprintf(stdout, "=============================================================================================\n\n");
-  fprintf(stdout, "Usage: prs2fpga [-he] [-On] [-p <process_name>] [-o <*.file>] <*.act>\n");
+  fprintf(stdout, "Usage: prs2fpga [-he] [-On] [-p <process_name>] [-c <cells>] [-o <*.file>] <*.act>\n");
   fprintf(stdout, "-p - Specify process name;\n");
   fprintf(stdout, "-o - Save to the file(default stdout);\n");
   fprintf(stdout, "-O<0,1...> - C style optimization flag(0 default);\n");
-  fprintf(stdout, "-c - Specify config file;\n");
+  fprintf(stdout, "-c <file> - Specify cells file;\n");
   fprintf(stdout, "-e - Print an explicit delay(non-synthesizable/overwrites O option);\n");
   fprintf(stdout, "-h - Usage guide;\n\n");
   fprintf(stdout, "=============================================================================================\n");
@@ -141,11 +141,12 @@ int main (int argc, char **argv) {
     fatal_error("Missing process name\n");
   }
  
+  a = new Act(argv[optind]);
+
   if (cell_file) {
     a->Merge (cell_file);
   }
 
-  a = new Act(argv[optind]);
   a->Expand ();
 
   if (cell_file) {

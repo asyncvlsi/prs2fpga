@@ -23,6 +23,7 @@
 #include <vector>
 #include <map>
 #include <string.h>
+#include <string>
 
 namespace fpga {
 
