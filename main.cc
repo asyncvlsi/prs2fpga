@@ -31,28 +31,13 @@ void usage () {
   fprintf(stdout, "=============================================================================================\n");
   logo();
   fprintf(stdout, "=============================================================================================\n\n");
-  fprintf(stdout, "Usage: prs2fpga [-he] [-p <process_name>] [-o <*.file>] [-c <*.conf>] <*.act>\n");
+  fprintf(stdout, "Usage: prs2fpga [-he] [-On] [-p <process_name>] [-o <*.file>] <*.act>\n");
   fprintf(stdout, "-p - Specify process name;\n");
   fprintf(stdout, "-o - Save to the file(default stdout);\n");
+  fprintf(stdout, "-O<0,1...> - C style optimization flag(0 default);\n");
   fprintf(stdout, "-c - Specify config file;\n");
-  fprintf(stdout, "-e - Print an explicit delay(non-synthesizable);\n");
+  fprintf(stdout, "-e - Print an explicit delay(non-synthesizable/overwrites O option);\n");
   fprintf(stdout, "-h - Usage guide;\n\n");
-  fprintf(stdout, "=============================================================================================\n");
-  fprintf(stdout, "Configuration file description:\n");
-  fprintf(stdout, "VENDOR - 0 - Xilinx; 1 - Intel(Altera)\n");
-  fprintf(stdout, "CHIP - full chip name: Family, Package, Temp.grade, Speed grade etc.\n");
-  fprintf(stdout, "LUT - number of luts\n");
-  fprintf(stdout, "FF - number of flip-flops\n");
-  fprintf(stdout, "DSP - number of dsp blocks\n");
-  fprintf(stdout, "NUM - number of available chips\n");
-  fprintf(stdout, "FREQ - targeting frequency\n");
-  fprintf(stdout, "PINS - number of available pins on the chip\n");
-  fprintf(stdout, "INTERFACE - 0 - NON; 1 - TileLink; 2 - AXI; 3 - UART\n");
-  fprintf(stdout, "INCLUDE_TCL - paths to additional tcl scripts\n");
-  fprintf(stdout, "INCLUDE_XDC - paths to additional xdc files\n");
-  fprintf(stdout, "OPTIMIZATION - 0 - ff per gate; 1 - reduced number of ffs\n");
-  fprintf(stdout, "VERILOG - 0 - no print; 1 - print verilog\n");
-  fprintf(stdout, "DUT - 0 no dut template; 1 - create dut template\n");
   fprintf(stdout, "=============================================================================================\n");
 }
 
@@ -75,12 +60,18 @@ int main (int argc, char **argv) {
   extern int opterr;
   opterr = 0;
 
+  int print_option = 1;
+  int opt_option = 0;
   int unit_option = 0;
 
-  while ((key = getopt (argc, argv, "p:ehmc:o:t:")) != -1) {
+  while ((key = getopt (argc, argv, "p:ehm:o:t:O:P")) != -1) {
     switch (key) {
-      case 'c':
-        conf = optarg;
+      case 'O':
+        if (optarg == NULL) { fatal_error("Missing optimization level"); }
+        opt_option = atoi(optarg);
+        break;
+      case 'P':
+        print_option = 0;
         break;
       case 'o':
         fout  = fopen(optarg, "w");
@@ -137,7 +128,7 @@ int main (int argc, char **argv) {
 
   fpga::project *fp = new fpga::project;
 	fpga::graph *fg;
-  fpga::fpga_config *fc;
+  fpga::config *fc = new fpga::config;
   
   fp->g = fg;
 
@@ -147,19 +138,16 @@ int main (int argc, char **argv) {
 	Assert (BOOL->run (p), "Booleanize pass failed");
   Assert (NETL->run(p) , "Netlist pass failed");
 
-  FILE *conf_file;
-  conf_file = fopen(conf, "r");
-  if (conf_file == 0) {
-    fc = fpga::read_config(conf_file, 0);
+  if (opt_option != 0) {
+    fc->opt = opt_option;
   } else {
-    fc = fpga::read_config(conf_file, 1);
-    fclose(conf_file);
+    fc->opt = 0;
   }
-
   if (unit_option == -1) {
     fc->opt = -1;
   }
-  
+  fc->print = print_option;
+ 
   fp->c = fc;
 
   fprintf(stdout, "==========================================\n");

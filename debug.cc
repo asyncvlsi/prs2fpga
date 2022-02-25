@@ -255,36 +255,4 @@ void print_gate (gate *g, FILE *output) {
   fprintf(output, "====================================\n");
 }
 
-void print_config (fpga_config *fc, FILE *output) {
-  fprintf(output, "VENDOR: %i\n", fc->vendor);
-  fprintf(output, "CHIP: %s\n", fc->chip.c_str());
-  fprintf(output, "LUT: %i\n", fc->lut);
-  fprintf(output, "FF: %i\n", fc->ff);
-  fprintf(output, "DSP: %i\n", fc->dsp);
-  fprintf(output, "CHIP NUM: %i\n", fc->num);
-  fprintf(output, "FREQ: %i\n", fc->freq);
-  fprintf(output, "PINS: %i\n", fc->pins);
-  fprintf(output, "INTF: ");
-  if (fc->intf == 0) {
-    fprintf(output, "NON\n");
-  } else if (fc->intf == 1) {
-    fprintf(output, "TileLink\n");
-  } else if (fc->intf == 2) {
-    fprintf(output, "AXI\n");
-  } else if (fc->intf == 3) {
-    fprintf(output, "UART\n");
-  }
-  fprintf(output, "INC TCL: ");
-  for (auto path : fc->inct) {
-    fprintf(output, "%s;", path.c_str());
-  }
-  fprintf(output, "\n");
-  fprintf(output, "INC XDC: ");
-  for (auto path : fc->incx) {
-    fprintf(output, "%s;", path.c_str());
-  }
-  fprintf(output, "\n");
-  fprintf(output, "OPT: %i\n", fc->opt);
-}
-
 }

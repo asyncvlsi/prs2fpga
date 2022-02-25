@@ -169,9 +169,14 @@ struct graph {
   node *hd, *tl;
 };
 
+struct config {
+  unsigned int print:1;
+  unsigned int opt;
+};
+
 struct project {
   graph *g;
-  fpga_config *c;
+  config *c;
 
   unsigned int need_delay:2;  //0 - no, 1 - syn, 2 - non syn
   unsigned int need_hi_arb:1; //0 - no, 1 - yes
@@ -187,6 +192,5 @@ void print_verilog (project *, FILE *);
 
 }
 
-#include "proto_config.h"
 #include "debug.h"
 
