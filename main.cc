@@ -4,6 +4,7 @@
 #include <act/graph.h>
 #include <act/passes/booleanize.h>
 #include <act/passes/netlist.h>
+#include <act/passes/cells.h>
 
 #include "debug.h"
 
@@ -49,13 +50,7 @@ int main (int argc, char **argv) {
   Act::Init(&argc, &argv);
   config_set_int ("net.black_box_mode", 0);
 
-  int print_or_not_to_print = 0; //that is the question
-  int how_to_print = 0;
-  int where_to_print = 0;
   FILE *fout  = stdout;
-  char *conf = NULL;
-
-  int key = 0;
 
   extern int opterr;
   opterr = 0;
@@ -64,7 +59,10 @@ int main (int argc, char **argv) {
   int opt_option = 0;
   int unit_option = 0;
 
-  while ((key = getopt (argc, argv, "p:ehm:o:t:O:P")) != -1) {
+  char *cell_file = NULL;
+
+  int key = 0;
+  while ((key = getopt (argc, argv, "c:p:ehm:o:t:O:P")) != -1) {
     switch (key) {
       case 'O':
         if (optarg == NULL) { fatal_error("Missing optimization level"); }
@@ -92,6 +90,15 @@ int main (int argc, char **argv) {
         }
         proc = Strdup(optarg);
         break;
+      case 'c':
+        if (cell_file) {
+          FREE(cell_file);
+        }
+        if (optarg == NULL) {
+          fatal_error ("Missing cell file");
+        }
+        cell_file = Strdup(optarg);
+        break;
       case ':':
         fprintf(stderr, "Need a file here\n");
         break;
@@ -113,8 +120,24 @@ int main (int argc, char **argv) {
     fatal_error("Missing process name\n");
   }
  
+  if (cell_file) {
+    a->Merge (cell_file);
+  }
+
   a = new Act(argv[optind]);
   a->Expand ();
+
+  if (cell_file) {
+    ActCellPass *cp = new ActCellPass (a);
+    cp->run();
+
+    FILE *oc = fopen (cell_file, "w");
+    if (!oc) {
+      fatal_error ("Could not write cell file");
+    }
+    cp->Print (oc);
+    fclose (oc);
+  }
 
 	Process *p = a->findProcess (proc);
 
