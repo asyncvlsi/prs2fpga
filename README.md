@@ -6,3 +6,6 @@ Run:
 prs2fpga -h
 ```
 to see usage menu.
+
+If you use this tool for a publication, please reference the following paper (linked above):
+   * Ruslan Dashkin and Rajit Manohar. General Approach to Asynchronous Circuits Simulation Using Synchronous FPGAs. _IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems_ doi: 10.1109/TCAD.2021.3131546.
