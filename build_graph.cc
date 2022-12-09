@@ -617,7 +617,7 @@ void add_proc_ports (Scope *cs, act_boolean_netlist_t *bnl, node *pn) {
   //adding global ports to process node
   for (int i = 0; i < A_LEN(bnl->used_globals); i++) {
     port *fgp = new port;
-    fgp->c = bnl->used_globals[i]->toid()->Canonical(cs); 
+    fgp->c = bnl->used_globals[i].c->toid()->Canonical(cs); 
     fgp->dir = 1;
     fgp->bi = 0;
     fgp->setOwner(pn);
