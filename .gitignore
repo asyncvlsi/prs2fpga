@@ -1,6 +1,7 @@
 Makefile.deps
 i386_*
 arm*
+x86_64_*
 prs2fpga.*
 *~
 #*
