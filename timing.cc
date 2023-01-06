@@ -654,7 +654,7 @@ void process_time_proc (node *n, act_spec *sp) {
 void process_time_spec (project *p, node *n) {
   act_spec *sp = n->spec;
   while (sp) {
-    if (ACT_SPEC_ISTIMING (sp)) {
+    if (ACT_SPEC_ISTIMINGFORK (sp)) {
       process_time_proc (n, sp);
       p->need_delay = 1;
     }
@@ -868,7 +868,7 @@ void find_userdef_spec (project *proj, node *n, UserDef *ud, ActId *pref){
         }
         if (iud->getlang()) {
           if (iud->getlang()->getspec()) {
-            if (ACT_SPEC_ISTIMING(iud->getlang()->getspec())) {
+            if (ACT_SPEC_ISTIMINGFORK(iud->getlang()->getspec())) {
               sp = iud->getlang()->getspec();
               proj->need_delay = 1;
             }
