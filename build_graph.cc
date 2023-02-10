@@ -24,7 +24,7 @@
 #include <vector>
 #include <algorithm>
 #include <utility>
-#include <act/graph.h>
+#include "graph.h"
 #include <act/passes/booleanize.h>
 #include <act/passes/netlist.h>
 #include <act/iter.h>

@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
-#include <act/graph.h>
-#include <act/debug.h>
+#include "graph.h"
+#include "debug.h"
 
 namespace fpga {
 

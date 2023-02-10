@@ -21,7 +21,7 @@
 
 #include <vector>
 #include <string.h>
-#include <act/graph.h>
+#include "graph.h"
 
 namespace fpga{
 

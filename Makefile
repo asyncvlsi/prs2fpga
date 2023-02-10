@@ -21,7 +21,6 @@
 EXE=prs2fpga.$(EXT)
 
 TARGETS=$(EXE)
-TARGETINCS=graph.h debug.h 
 TARGETINCSUBDIR=act
 
 OBJS=main.o build_graph.o graph.o arb.o timing.o print.o multidr.o debug.o
